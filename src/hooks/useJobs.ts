@@ -8,6 +8,7 @@ import {
   createJob, 
   updateJob, 
   updateJobStatus,
+  deleteJob,
   getJobCounts,
   getJobsDueToday 
 } from '@/lib/db/jobs';
@@ -118,6 +119,25 @@ export function useUpdateJobStatus() {
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to update status');
+    },
+  });
+}
+
+export function useDeleteJob() {
+  const queryClient = useQueryClient();
+  const supabase = createClient();
+
+  return useMutation({
+    mutationFn: (id: string) => deleteJob(supabase, id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['job', id] });
+      queryClient.invalidateQueries({ queryKey: ['jobCounts'] });
+      queryClient.invalidateQueries({ queryKey: ['jobsDueToday'] });
+      toast.success('Job deleted');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to delete job');
     },
   });
 }

@@ -12,6 +12,8 @@ import {
   LogOut,
   Menu,
   X,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
@@ -29,7 +31,8 @@ const navigation = [
 export function Sidebar() {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
-  const { sidebarOpen, toggleSidebar } = useUIStore();
+  const { sidebarOpen, sidebarCollapsed, toggleSidebar, toggleSidebarCollapsed } =
+    useUIStore();
 
   // While user profile loads, show all nav items (middleware already verified auth).
   // Once loaded, filter by role.
@@ -55,19 +58,66 @@ export function Sidebar() {
         />
       )}
 
-      <aside className={`
+      <aside
+        className={`
         fixed lg:static inset-y-0 left-0 z-40
-        w-64 bg-white border-r border-gray-200
-        transform transition-transform duration-200 ease-in-out
+        w-64 shrink-0 bg-white border-r border-gray-200
+        transform transition-[transform,width] duration-200 ease-in-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}>
-        <div className="flex flex-col h-full">
-          <div className="p-4 border-b">
+        ${sidebarCollapsed ? 'lg:w-[4.25rem] lg:min-w-[4.25rem]' : 'lg:w-64'}
+      `}
+      >
+        <div className="flex flex-col h-full min-h-0">
+          {/* Mobile / drawer: full title */}
+          <div className="border-b p-4 lg:hidden">
             <h1 className="text-xl font-bold text-blue-600">CamClinic</h1>
             <p className="text-xs text-gray-500 mt-1">Camera Service Management</p>
           </div>
 
-          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          {/* Desktop: expanded header + collapse control */}
+          <div
+            className={`border-b p-4 items-start justify-between gap-2 ${
+              sidebarCollapsed ? 'hidden' : 'hidden lg:flex'
+            }`}
+          >
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold text-blue-600">CamClinic</h1>
+              <p className="text-xs text-gray-500 mt-1">Camera Service Management</p>
+            </div>
+            <button
+              type="button"
+              onClick={toggleSidebarCollapsed}
+              className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              aria-label="Minimize sidebar"
+              title="Minimize sidebar"
+            >
+              <ChevronsLeft className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
+
+          {/* Desktop: collapsed — brand + expand */}
+          <div
+            className={`border-b items-center gap-3 py-4 px-2 ${
+              sidebarCollapsed ? 'hidden lg:flex lg:flex-col' : 'hidden'
+            }`}
+          >
+            <span className="text-xl font-bold text-blue-600" aria-hidden>
+              C
+            </span>
+            <button
+              type="button"
+              onClick={toggleSidebarCollapsed}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+            >
+              <ChevronsRight className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
+
+          <nav
+            className={`flex-1 overflow-y-auto space-y-1 p-4 ${sidebarCollapsed ? 'lg:p-2 lg:space-y-1' : ''}`}
+          >
             {filteredNavigation.map((item) => {
               const isActive =
                 pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -75,10 +125,12 @@ export function Sidebar() {
                 <Link
                   key={item.name}
                   href={item.href}
+                  title={item.name}
                   className={`
-                    flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                    ${isActive 
-                      ? 'bg-blue-50 text-blue-700' 
+                    flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors
+                    ${sidebarCollapsed ? 'lg:justify-center lg:px-2 lg:py-2.5' : ''}
+                    ${isActive
+                      ? 'bg-blue-50 text-blue-700'
                       : 'text-gray-700 hover:bg-gray-100'
                     }
                   `}
@@ -86,18 +138,18 @@ export function Sidebar() {
                     if (window.innerWidth < 1024) toggleSidebar();
                   }}
                 >
-                  <item.icon className="h-5 w-5" />
-                  {item.name}
+                  <item.icon className="h-5 w-5 shrink-0" aria-hidden />
+                  <span className={sidebarCollapsed ? 'lg:sr-only' : ''}>{item.name}</span>
                 </Link>
               );
             })}
           </nav>
 
-          <div className="p-4 border-t">
-            <div className="mb-3">
+          <div className={`border-t p-4 ${sidebarCollapsed ? 'lg:p-2' : ''}`}>
+            <div className={`mb-3 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
               {user ? (
                 <>
-                  <p className="text-sm font-medium text-gray-900">{user.full_name}</p>
+                  <p className="text-sm font-medium text-gray-900 truncate">{user.full_name}</p>
                   <p className="text-xs text-gray-500 capitalize">{user.role.replace(/_/g, ' ')}</p>
                 </>
               ) : (
@@ -110,11 +162,12 @@ export function Sidebar() {
             <Button
               variant="outline"
               size="sm"
-              className="w-full justify-start"
+              className={`w-full justify-start ${sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''}`}
               onClick={signOut}
+              title="Sign out"
             >
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
+              <LogOut className={`h-4 w-4 shrink-0 ${sidebarCollapsed ? '' : 'mr-2'}`} />
+              <span className={sidebarCollapsed ? 'lg:sr-only' : ''}>Sign Out</span>
             </Button>
           </div>
         </div>

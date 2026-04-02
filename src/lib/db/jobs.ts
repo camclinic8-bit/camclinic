@@ -12,6 +12,11 @@ import { JobStatus } from '@/types/enums';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TypedSupabaseClient = SupabaseClient<any>;
 
+/** Trim search; avoid commas (break PostgREST .or) and stray % in ilike patterns. */
+function sanitizeJobSearchTerm(raw: string): string {
+  return raw.trim().replace(/,/g, ' ').replace(/%/g, '');
+}
+
 export async function getJobs(
   supabase: TypedSupabaseClient,
   filters?: JobFilters,
@@ -71,7 +76,26 @@ export async function getJobs(
   }
 
   if (filters?.search) {
-    query = query.or(`job_number.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
+    const term = sanitizeJobSearchTerm(filters.search);
+    if (term.length > 0) {
+      // Match jobs by job # / description, or by linked customer name / phone (RLS-scoped).
+      const digitsOnly = term.replace(/\D/g, '');
+      const customerOr = [
+        `name.ilike.%${term}%`,
+        `phone.ilike.%${term}%`,
+        ...(digitsOnly.length >= 4 && digitsOnly !== term ? [`phone.ilike.%${digitsOnly}%`] : []),
+      ].join(',');
+
+      const { data: matchingCustomers } = await supabase.from('customers').select('id').or(customerOr);
+
+      const orParts = [`job_number.ilike.%${term}%`, `description.ilike.%${term}%`];
+      const ids = matchingCustomers?.map((c) => c.id) ?? [];
+      if (ids.length > 0) {
+        const maxIn = 200;
+        orParts.push(`customer_id.in.(${ids.slice(0, maxIn).join(',')})`);
+      }
+      query = query.or(orParts.join(','));
+    }
   }
 
   const from = (page - 1) * pageSize;
@@ -330,6 +354,26 @@ export async function updateJobStatus(
   }
 
   return data as Job;
+}
+
+export async function deleteJob(
+  supabase: TypedSupabaseClient,
+  id: string
+): Promise<void> {
+  const { data, error } = await supabase
+    .from('jobs')
+    .delete()
+    .eq('id', id)
+    .select('id');
+
+  if (error) {
+    throw new Error(error.message || 'Failed to delete job');
+  }
+  if (!data?.length) {
+    throw new Error(
+      'Job was not deleted. You may need super admin access, or apply the latest database migrations.'
+    );
+  }
 }
 
 export async function getJobStatusHistory(
