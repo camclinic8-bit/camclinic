@@ -19,11 +19,11 @@ export function useTechnicians(branchId?: string) {
   const user = useAuthStore((state) => state.user);
 
   return useQuery({
-    queryKey: ['technicians', branchId],
+    queryKey: ['technicians', branchId, user?.role, user?.branch_id],
     queryFn: () => getTechnicians(supabase, branchId),
-    staleTime: 0,
+    staleTime: 60 * 1000, // 1 minute
     refetchOnWindowFocus: false,
-    enabled: !!user,
+    enabled: !!user && (user?.role === 'super_admin' || user?.role === 'service_manager' || user?.role === 'service_incharge'),
   });
 }
 
@@ -34,7 +34,7 @@ export function useServiceIncharges(branchId?: string) {
   return useQuery({
     queryKey: ['serviceIncharges', branchId],
     queryFn: () => getServiceIncharges(supabase, branchId),
-    staleTime: 0,
+    staleTime: 60 * 1000, // 1 minute
     refetchOnWindowFocus: false,
     enabled: !!user,
   });
@@ -46,6 +46,7 @@ export function useTechnician(id: string) {
   return useQuery({
     queryKey: ['technician', id],
     queryFn: () => getTechnicianWithJobCounts(supabase, id),
+    staleTime: 60 * 1000, // 1 minute
     enabled: !!id,
   });
 }
@@ -55,11 +56,13 @@ export function useAllUsers() {
   const user = useAuthStore((state) => state.user);
 
   return useQuery({
-    queryKey: ['allUsers'],
+    queryKey: ['allUsers', user?.role, user?.shop_id, user?.branch_id],
     queryFn: () => getAllUsers(supabase),
-    staleTime: 0,
+    staleTime: 60 * 1000, // 1 minute
     refetchOnWindowFocus: false,
-    enabled: !!user,
+    enabled: !!user && (user?.role === 'super_admin'), // Only super admin can see all users
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 }
 

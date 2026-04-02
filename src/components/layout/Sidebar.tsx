@@ -22,20 +22,24 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Jobs', href: '/jobs', icon: Briefcase },
   { name: 'Customers', href: '/customers', icon: Users },
-  { name: 'Technicians', href: '/technicians', icon: Wrench },
-  { name: 'Branches', href: '/branches', icon: Building2, adminOnly: true },
+  { name: 'Technicians', href: '/technicians', icon: Wrench, roles: ['super_admin', 'service_manager', 'service_incharge'] },
+  { name: 'Branches', href: '/branches', icon: Building2, roles: ['super_admin', 'service_manager', 'service_incharge'] },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
-  { name: 'Settings', href: '/settings', icon: Settings, adminOnly: true },
+  { name: 'Settings', href: '/settings', icon: Settings, roles: ['super_admin'] },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { user, signOut, isSuperAdmin } = useAuth();
+  const { user, signOut, isSuperAdmin, isServiceManager, isServiceIncharge, isTechnician } = useAuth();
   const { sidebarOpen, toggleSidebar } = useUIStore();
 
-  const filteredNavigation = navigation.filter(
-    item => !item.adminOnly || isSuperAdmin
-  );
+  const filteredNavigation = navigation.filter(item => {
+    // If no roles specified, show to everyone
+    if (!item.roles) return true;
+    
+    // Check if user's role is in the allowed roles
+    return item.roles.includes(user?.role || '');
+  });
 
   return (
     <>

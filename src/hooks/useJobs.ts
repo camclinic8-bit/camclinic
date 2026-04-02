@@ -20,10 +20,15 @@ export function useJobs(filters?: JobFilters, page = 1, pageSize = 20) {
   const supabase = createClient();
   const user = useAuthStore((state) => state.user);
 
+  // For technicians, override filters to only show their assigned jobs
+  const actualFilters = user?.role === 'technician' 
+    ? { ...filters, assignedTechnicianId: user.id }
+    : filters;
+
   return useQuery({
-    queryKey: ['jobs', filters, page, pageSize],
-    queryFn: () => getJobs(supabase, filters, page, pageSize),
-    staleTime: 0,
+    queryKey: ['jobs', actualFilters, page.toString(), pageSize.toString(), user?.role, user?.id],
+    queryFn: () => getJobs(supabase, actualFilters, page, pageSize),
+    staleTime: 60 * 1000, // 1 minute
     refetchOnWindowFocus: false,
     enabled: !!user,
   });
@@ -35,6 +40,7 @@ export function useJob(id: string) {
   return useQuery({
     queryKey: ['job', id],
     queryFn: () => getJobById(supabase, id),
+    staleTime: 60 * 1000, // 1 minute
     enabled: !!id,
   });
 }
@@ -115,9 +121,9 @@ export function useJobCounts(branchId?: string) {
   const user = useAuthStore((state) => state.user);
 
   return useQuery({
-    queryKey: ['jobCounts', branchId],
+    queryKey: ['jobCounts', branchId, user?.role, user?.id],
     queryFn: () => getJobCounts(supabase, branchId),
-    staleTime: 0,
+    staleTime: 60 * 1000, // 1 minute
     refetchOnWindowFocus: false,
     enabled: !!user,
   });
@@ -128,9 +134,9 @@ export function useJobsDueToday(branchId?: string) {
   const user = useAuthStore((state) => state.user);
 
   return useQuery({
-    queryKey: ['jobsDueToday', branchId],
+    queryKey: ['jobsDueToday', branchId, user?.role, user?.id],
     queryFn: () => getJobsDueToday(supabase, branchId),
-    staleTime: 0,
+    staleTime: 60 * 1000, // 1 minute
     refetchOnWindowFocus: false,
     enabled: !!user,
   });

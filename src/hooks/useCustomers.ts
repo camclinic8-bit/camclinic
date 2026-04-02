@@ -13,14 +13,14 @@ import {
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
 
-export function useCustomers(search?: string, page = 1, pageSize = 20) {
+export function useCustomers(page = 1, pageSize = 20, search?: string) {
   const supabase = createClient();
   const user = useAuthStore((state) => state.user);
 
   return useQuery({
-    queryKey: ['customers', search, page, pageSize],
+    queryKey: ['customers', page.toString(), pageSize.toString(), search, user?.role, user?.id],
     queryFn: () => getCustomers(supabase, search, page, pageSize),
-    staleTime: 0,
+    staleTime: 60 * 1000, // 1 minute
     refetchOnWindowFocus: false,
     enabled: !!user,
   });
@@ -32,6 +32,7 @@ export function useCustomer(id: string) {
   return useQuery({
     queryKey: ['customer', id],
     queryFn: () => getCustomerWithJobCount(supabase, id),
+    staleTime: 60 * 1000, // 1 minute
     enabled: !!id,
   });
 }

@@ -19,7 +19,7 @@ export default function CustomersPage() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [formData, setFormData] = useState({ name: '', phone: '', email: '', address: '' });
 
-  const { data, isLoading } = useCustomers(search || undefined, page, 20);
+  const { data, isLoading } = useCustomers(page, 20, search || undefined);
   const createCustomer = useCreateCustomer();
   const updateCustomer = useUpdateCustomer();
 

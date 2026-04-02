@@ -12,15 +12,17 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmp
 import { Badge } from '@/components/ui/Badge';
 import { useAllUsers, useUpdateUserRole } from '@/hooks/useTechnicians';
 import { useBranches } from '@/hooks/useBranches';
+import { useQueryClient } from '@tanstack/react-query';
 import { USER_ROLE_LABELS, UserRole } from '@/types/enums';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
 export default function SettingsPage() {
   const { user: currentUser, isSuperAdmin } = useAuth();
-  const { data: users, isLoading, refetch } = useAllUsers();
+  const { data: users, isLoading, error, refetch } = useAllUsers();
   const { data: branches } = useBranches();
   const updateRole = useUpdateUserRole();
+  const queryClient = useQueryClient();
 
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<UserRole>('technician');
@@ -77,7 +79,14 @@ export default function SettingsPage() {
       });
       toast.success('User role updated successfully');
       setEditingUser(null);
+      
+      // Invalidate queries to refresh data
+      await queryClient.invalidateQueries({ queryKey: ['allUsers'] });
+      await queryClient.invalidateQueries({ queryKey: ['technicians'] });
+      await queryClient.invalidateQueries({ queryKey: ['serviceIncharges'] });
+      refetch();
     } catch (error) {
+      console.error('Update role error:', error);
       toast.error('Failed to update user role');
     }
   };
@@ -153,8 +162,21 @@ export default function SettingsPage() {
         role: 'technician',
         branchId: '',
       });
-      refetch();
+      
+      // Invalidate multiple queries to ensure fresh data
+      await queryClient.invalidateQueries({ queryKey: ['allUsers'] });
+      await queryClient.invalidateQueries({ queryKey: ['technicians'] });
+      await queryClient.invalidateQueries({ queryKey: ['serviceIncharges'] });
+      
+      // Force refetch for immediate UI update
+      await refetch();
+      
+      // Show additional feedback
+      setTimeout(() => {
+        toast.info('User list refreshed');
+      }, 500);
     } catch (error) {
+      console.error('Create user error:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to create user');
     } finally {
       setIsCreating(false);
@@ -181,7 +203,17 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="h-64 bg-gray-100 animate-pulse rounded" />
+              <div className="flex flex-col items-center justify-center h-64 space-y-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <p className="text-gray-500">Loading users...</p>
+              </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center h-64 space-y-4">
+                <p className="text-red-600">Failed to load users</p>
+                <Button onClick={() => refetch()} variant="outline">
+                  Try Again
+                </Button>
+              </div>
             ) : (
               <Table>
                 <TableHeader>

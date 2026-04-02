@@ -15,19 +15,23 @@ import { toast } from 'sonner';
 
 export function useBranches() {
   const supabase = createClient();
+  const user = useAuthStore((state) => state.user);
 
   return useQuery({
-    queryKey: ['branches'],
+    queryKey: ['branches', user?.role, user?.branch_id],
     queryFn: () => getBranches(supabase),
+    enabled: !!user,
   });
 }
 
 export function useAllBranches() {
   const supabase = createClient();
+  const user = useAuthStore((state) => state.user);
 
   return useQuery({
-    queryKey: ['allBranches'],
+    queryKey: ['allBranches', user?.role, user?.branch_id],
     queryFn: () => getAllBranches(supabase),
+    enabled: !!user && (user?.role === 'super_admin' || user?.role === 'service_manager' || user?.role === 'service_incharge'),
   });
 }
 
