@@ -28,7 +28,6 @@ import { useUpdateJobCharges } from '@/hooks/useBilling';
 import { useAuth } from '@/hooks/useAuth';
 import { formatDate, formatDateTime, isExpired } from '@/lib/utils/dates';
 import { formatINR } from '@/lib/utils/currency';
-import { generateReceipt, generateQuote, generateInvoice, downloadPDF } from '@/lib/utils/pdf';
 import { JOB_STATUS_LABELS, PRODUCT_CONDITION_LABELS, JobStatus } from '@/types/enums';
 import { toast } from 'sonner';
 
@@ -39,7 +38,7 @@ function roundMoney(n: number): number {
 export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { data: job, isLoading } = useJob(id);
+  const { data: job, isPending } = useJob(id);
   const updateStatus = useUpdateJobStatus();
   const updateCharges = useUpdateJobCharges(id);
   const { canSetAnyStatus } = useAuth();
@@ -106,20 +105,23 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       ? 'partial'
       : 'unpaid';
 
-  const handleDownloadReceipt = () => {
+  const handleDownloadReceipt = async () => {
     if (!job) return;
+    const { generateReceipt, downloadPDF } = await import('@/lib/utils/pdf');
     const doc = generateReceipt(job);
     downloadPDF(doc, `receipt-${job.job_number}.pdf`);
   };
 
-  const handleDownloadQuote = () => {
+  const handleDownloadQuote = async () => {
     if (!job) return;
+    const { generateQuote, downloadPDF } = await import('@/lib/utils/pdf');
     const doc = generateQuote(job);
     downloadPDF(doc, `quote-${job.job_number}.pdf`);
   };
 
-  const handleDownloadInvoice = () => {
+  const handleDownloadInvoice = async () => {
     if (!job) return;
+    const { generateInvoice, downloadPDF } = await import('@/lib/utils/pdf');
     const doc = generateInvoice(job);
     downloadPDF(doc, `invoice-${job.job_number}.pdf`);
   };
@@ -129,7 +131,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     label,
   }));
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <div className="flex flex-col h-full">
         <Header title="Job Details" />

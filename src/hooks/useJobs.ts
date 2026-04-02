@@ -38,13 +38,16 @@ export function useJobs(filters?: JobFilters, page = 1, pageSize = 20) {
 
 export function useJob(id: string) {
   const supabase = createClient();
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: ['job', id],
     queryFn: () => getJobById(supabase, id),
-    staleTime: 60 * 1000, // 1 minute
-    enabled: !!id && isAuthenticated,
+    // Dashboard layout only renders when authenticated — avoid waiting on store + longer cache for snappy revisits
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    enabled: !!id,
   });
 }
 

@@ -16,6 +16,7 @@ import { useBranchStore } from '@/stores/branchStore';
 import { JobStatus, JobPriority, JOB_STATUS_LABELS, JOB_PRIORITY_LABELS } from '@/types/enums';
 import { formatDate } from '@/lib/utils/dates';
 import { formatINR } from '@/lib/utils/currency';
+import { summarizeJobProductsLine } from '@/lib/utils/jobProducts';
 
 export default function JobsPage() {
   const router = useRouter();
@@ -192,7 +193,12 @@ export default function JobsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {data.data.map((job) => (
+                    {data.data.map((job) => {
+                      const productsSummary = summarizeJobProductsLine(job.products, {
+                        maxEach: 32,
+                        maxLine: 72,
+                      });
+                      return (
                       <tr
                         key={job.id}
                         className="hover:bg-gray-50 cursor-pointer transition-colors"
@@ -205,13 +211,11 @@ export default function JobsPage() {
                             {job.customer?.phone?.trim() || '—'}
                           </div>
                         </td>
-                        <td className="px-3 lg:px-4 py-2 lg:py-2.5 text-gray-700 max-w-[240px] truncate">
-                          {job.products && job.products.length > 0
-                            ? job.products
-                                .map((p) => [p.brand, p.model].filter(Boolean).join(' ').trim())
-                                .filter(Boolean)
-                                .join(', ')
-                            : '-'}
+                        <td
+                          className="px-3 lg:px-4 py-2 lg:py-2.5 text-gray-700 max-w-[min(280px,28vw)]"
+                          title={productsSummary.full || undefined}
+                        >
+                          <span className="line-clamp-2 break-words">{productsSummary.line}</span>
                         </td>
                         <td className="px-3 lg:px-4 py-2 lg:py-2.5"><JobStatusBadge status={job.status} /></td>
                         <td className="px-3 lg:px-4 py-2 lg:py-2.5"><JobPriorityBadge priority={job.priority} /></td>
@@ -223,7 +227,8 @@ export default function JobsPage() {
                           {formatINR(job.balance_amount || 0)}
                         </td>
                       </tr>
-                    ))}
+                    );
+                    })}
                   </tbody>
                 </table>
               </CardContent>

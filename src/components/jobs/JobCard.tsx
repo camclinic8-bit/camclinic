@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
 import { Calendar, User, MapPin, Phone } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { JobStatusBadge } from './JobStatusBadge';
@@ -8,12 +9,30 @@ import { JobPriorityBadge } from './JobPriorityBadge';
 import { JobWithRelations } from '@/types/job';
 import { formatDate } from '@/lib/utils/dates';
 import { formatINR } from '@/lib/utils/currency';
+import { summarizeJobProductsLine } from '@/lib/utils/jobProducts';
+import { createClient } from '@/lib/supabase/client';
+import { getJobById } from '@/lib/db/jobs';
 
 interface JobCardProps {
   job: JobWithRelations;
 }
 
 export function JobCard({ job }: JobCardProps) {
+  const queryClient = useQueryClient();
+
+  const prefetchDetail = () => {
+    void queryClient.prefetchQuery({
+      queryKey: ['job', job.id],
+      queryFn: () => getJobById(createClient(), job.id),
+      staleTime: 5 * 60 * 1000,
+    });
+  };
+
+  const productSummary = summarizeJobProductsLine(job.products, {
+    maxEach: 36,
+    maxLine: 110,
+  });
+
   const priorityBorderColors = {
     immediate: 'border-l-red-500',
     high: 'border-l-orange-500',
@@ -22,7 +41,7 @@ export function JobCard({ job }: JobCardProps) {
   };
 
   return (
-    <Link href={`/jobs/${job.id}`}>
+    <Link href={`/jobs/${job.id}`} prefetch onMouseEnter={prefetchDetail} onFocus={prefetchDetail}>
       <Card className={`border-l-4 ${priorityBorderColors[job.priority]} hover:shadow-md transition-shadow cursor-pointer`}>
         <CardContent className="p-3 sm:p-4 text-sm lg:text-xs">
           <div className="flex items-start justify-between gap-2 mb-2 lg:mb-3">
@@ -43,8 +62,11 @@ export function JobCard({ job }: JobCardProps) {
           </div>
 
           {job.products && job.products.length > 0 && (
-            <p className="text-sm lg:text-xs text-gray-700 mb-2">
-              {job.products.map(p => `${p.brand || ''} ${p.model || ''}`.trim()).filter(Boolean).join(', ') || 'No products'}
+            <p
+              className="text-sm lg:text-xs text-gray-700 mb-2 line-clamp-2 break-words"
+              title={productSummary.full || undefined}
+            >
+              {productSummary.line}
             </p>
           )}
 

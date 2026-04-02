@@ -30,7 +30,8 @@ export async function getJobs(
       delivery_branch:branches!jobs_delivery_branch_id_fkey(id, name),
       assigned_incharge:profiles!jobs_assigned_incharge_id_fkey(id, full_name, phone),
       assigned_technician:profiles!jobs_assigned_technician_id_fkey(id, full_name, phone),
-      created_by_user:profiles!jobs_created_by_fkey(id, full_name)
+      created_by_user:profiles!jobs_created_by_fkey(id, full_name),
+      products:job_products(id, brand, model)
     `, { count: 'exact' });
 
   if (filters?.status) {
@@ -95,25 +96,41 @@ export async function getJobById(
 ): Promise<JobWithRelations | null> {
   const { data, error } = await supabase
     .from('jobs')
-    .select(`
+    .select(
+      `
       *,
-      customer:customers(*),
-      service_branch:branches!jobs_service_branch_id_fkey(*),
-      delivery_branch:branches!jobs_delivery_branch_id_fkey(*),
-      assigned_incharge:profiles!jobs_assigned_incharge_id_fkey(*),
-      assigned_technician:profiles!jobs_assigned_technician_id_fkey(*),
-      created_by_user:profiles!jobs_created_by_fkey(*),
+      customer:customers(id, name, phone, email, address),
+      service_branch:branches!jobs_service_branch_id_fkey(id, name),
+      delivery_branch:branches!jobs_delivery_branch_id_fkey(id, name),
+      assigned_technician:profiles!jobs_assigned_technician_id_fkey(id, full_name),
       products:job_products(
-        *,
-        accessories:product_accessories(*),
-        other_parts:product_other_parts(*)
+        id,
+        job_id,
+        brand,
+        model,
+        serial_number,
+        condition,
+        description,
+        remarks,
+        has_warranty,
+        warranty_description,
+        warranty_expiry_date,
+        accessories:product_accessories(id, job_product_id, name),
+        other_parts:product_other_parts(id, job_product_id, name)
       ),
-      spare_parts(*),
+      spare_parts(id, job_id, name, quantity, unit_price, total_price),
       status_history:job_status_history(
-        *,
-        changed_by_user:profiles(*)
+        id,
+        job_id,
+        from_status,
+        to_status,
+        changed_by,
+        notes,
+        created_at,
+        changed_by_user:profiles!job_status_history_changed_by_fkey(id, full_name)
       )
-    `)
+    `
+    )
     .eq('id', id)
     .single();
 
@@ -122,7 +139,13 @@ export async function getJobById(
     throw error;
   }
 
-  return data as unknown as JobWithRelations;
+  const row = data as unknown as JobWithRelations;
+  if (row.status_history?.length) {
+    row.status_history = [...row.status_history].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+  }
+  return row;
 }
 
 export async function createJob(
@@ -375,7 +398,8 @@ export async function getJobsDueToday(
       *,
       customer:customers(*),
       service_branch:branches!jobs_service_branch_id_fkey(*),
-      assigned_technician:profiles!jobs_assigned_technician_id_fkey(*)
+      assigned_technician:profiles!jobs_assigned_technician_id_fkey(*),
+      products:job_products(id, brand, model)
     `)
     .eq('estimate_delivery_date', today)
     .not('status', 'in', '("completed","cancelled")');

@@ -166,7 +166,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
   const { id } = use(params);
   const router = useRouter();
 
-  const { data: job, isLoading } = useJob(id);
+  const { data: job, isPending } = useJob(id);
   const supabase = createClient();
   const { data: spareParts = [] } = useSpareParts(id);
   const updateJob = useUpdateJob();
@@ -425,7 +425,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
 
   // ─── Loading / not found states ─────────────────────────────────────────────
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <div className="flex flex-col h-full">
         <Header title="Edit Job" />
