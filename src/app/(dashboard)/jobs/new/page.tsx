@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Plus, Trash2, Search } from 'lucide-react';
@@ -11,12 +11,14 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { ChipInput } from '@/components/ui/ChipInput';
 import { useCreateJob } from '@/hooks/useJobs';
 import { useSearchCustomers, useCreateCustomer } from '@/hooks/useCustomers';
 import { useBranches } from '@/hooks/useBranches';
 import { useTechnicians, useServiceIncharges } from '@/hooks/useTechnicians';
-import { JOB_PRIORITY_LABELS, PRODUCT_CONDITION_LABELS, ProductCondition, JobPriority } from '@/types/enums';
+import { JOB_PRIORITY_LABELS, PRODUCT_CONDITION_LABELS, ProductCondition } from '@/types/enums';
 import { Customer } from '@/types/customer';
+import { toast } from 'sonner';
 
 const productSchema = z.object({
   brand: z.string().optional(),
@@ -28,8 +30,8 @@ const productSchema = z.object({
   has_warranty: z.boolean().optional(),
   warranty_description: z.string().optional(),
   warranty_expiry_date: z.string().optional(),
-  accessories: z.string().optional(),
-  other_parts: z.string().optional(),
+  accessories: z.array(z.string()).optional(),
+  other_parts: z.array(z.string()).optional(),
 });
 
 const jobSchema = z.object({
@@ -110,8 +112,22 @@ export default function NewJobPage() {
   };
 
   const handleCreateCustomer = async () => {
+    const name = newCustomerData.name.trim();
+    const phone = newCustomerData.phone.trim();
+    if (!name) {
+      toast.error('Customer name is required');
+      return;
+    }
+    if (!phone) {
+      toast.error('Phone number is required');
+      return;
+    }
     try {
-      const customer = await createCustomer.mutateAsync(newCustomerData);
+      const customer = await createCustomer.mutateAsync({
+        ...newCustomerData,
+        name,
+        phone,
+      });
       setSelectedCustomer(customer);
       setValue('customer_id', customer.id);
       setShowNewCustomer(false);
@@ -130,11 +146,11 @@ export default function NewJobPage() {
         products: data.products.map(p => ({
           ...p,
           condition: p.condition as ProductCondition || null,
-          accessories: p.accessories?.split(',').map(a => a.trim()).filter(Boolean) || [],
-          other_parts: p.other_parts?.split(',').map(a => a.trim()).filter(Boolean) || [],
+          accessories: p.accessories || [],
+          other_parts: p.other_parts || [],
         })),
       };
-      
+
       const job = await createJob.mutateAsync(jobInput);
       router.push(`/jobs/${job.id}`);
     } catch {
@@ -177,11 +193,16 @@ export default function NewJobPage() {
                     label="Name"
                     value={newCustomerData.name}
                     onChange={(e) => setNewCustomerData(d => ({ ...d, name: e.target.value }))}
+                    required
+                    placeholder="Customer name"
                   />
                   <Input
                     label="Phone"
                     value={newCustomerData.phone}
                     onChange={(e) => setNewCustomerData(d => ({ ...d, phone: e.target.value }))}
+                    required
+                    placeholder="Phone number (required)"
+                    autoComplete="tel"
                   />
                   <Input
                     label="Email (optional)"
@@ -370,17 +391,43 @@ export default function NewJobPage() {
                       placeholder="Select condition"
                       {...register(`products.${index}.condition`)}
                     />
-                    <Input
-                      label="Accessories (comma separated)"
-                      placeholder="Battery, Lens cap, Charger"
-                      {...register(`products.${index}.accessories`)}
+                    <Controller
+                      control={control}
+                      name={`products.${index}.accessories`}
+                      defaultValue={[]}
+                      render={({ field }) => (
+                        <ChipInput
+                          label="Accessories"
+                          value={field.value || []}
+                          onChange={field.onChange}
+                          placeholder="Add accessory, press Enter"
+                        />
+                      )}
                     />
                   </div>
-                  <Input
-                    label="Other Parts (comma separated)"
-                    placeholder="Original box, Manual"
-                    {...register(`products.${index}.other_parts`)}
+                  <Controller
+                    control={control}
+                    name={`products.${index}.other_parts`}
+                    defaultValue={[]}
+                    render={({ field }) => (
+                      <ChipInput
+                        label="Other Parts"
+                        value={field.value || []}
+                        onChange={field.onChange}
+                        placeholder="Add part, press Enter (e.g. Original box)"
+                      />
+                    )}
                   />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Product Description
+                    </label>
+                    <textarea
+                      className="w-full border rounded-lg px-3 py-2 text-sm"
+                      rows={2}
+                      {...register(`products.${index}.description`)}
+                    />
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Remarks
@@ -390,6 +437,33 @@ export default function NewJobPage() {
                       rows={2}
                       {...register(`products.${index}.remarks`)}
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id={`products.${index}.has_warranty`}
+                        className="rounded border-gray-300"
+                        {...register(`products.${index}.has_warranty`)}
+                      />
+                      <label htmlFor={`products.${index}.has_warranty`} className="text-sm font-medium text-gray-700">
+                        Has Warranty
+                      </label>
+                    </div>
+                    {/* eslint-disable-next-line react-hooks/incompatible-library -- RHF watch for conditional warranty fields */}
+                    {watch(`products.${index}.has_warranty`) && (
+                      <div className="grid md:grid-cols-2 gap-4 pl-5">
+                        <Input
+                          label="Warranty Description"
+                          {...register(`products.${index}.warranty_description`)}
+                        />
+                        <Input
+                          type="date"
+                          label="Warranty Expiry Date"
+                          {...register(`products.${index}.warranty_expiry_date`)}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

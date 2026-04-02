@@ -11,7 +11,7 @@ import {
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { JobCard } from '@/components/jobs/JobCard';
-import { useDashboardStats, useJobsReport } from '@/hooks/useReports';
+import { useDashboardStats } from '@/hooks/useReports';
 import { useJobsDueToday, useJobCounts } from '@/hooks/useJobs';
 import { useBranchStore } from '@/stores/branchStore';
 import { formatINR } from '@/lib/utils/currency';

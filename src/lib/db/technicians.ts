@@ -112,15 +112,24 @@ export async function getAllUsers(
   return (data as Profile[]) || [];
 }
 
-export async function updateUserRole(
+export type UserProfilePatch = {
+  role?: Profile['role'];
+  branch_id?: string | null;
+  is_active?: boolean;
+};
+
+export async function updateUserProfile(
   supabase: TypedSupabaseClient,
   userId: string,
-  role: Profile['role'],
-  branchId?: string | null
+  patch: UserProfilePatch
 ): Promise<Profile> {
-  const updateData: Record<string, unknown> = { role };
-  if (branchId !== undefined) {
-    updateData.branch_id = branchId;
+  const updateData: Record<string, unknown> = {};
+  if (patch.role !== undefined) updateData.role = patch.role;
+  if (patch.branch_id !== undefined) updateData.branch_id = patch.branch_id;
+  if (patch.is_active !== undefined) updateData.is_active = patch.is_active;
+
+  if (Object.keys(updateData).length === 0) {
+    throw new Error('No profile fields to update');
   }
 
   const { data, error } = await supabase

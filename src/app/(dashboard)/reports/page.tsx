@@ -10,7 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/Table';
 import { JobStatusBadge } from '@/components/jobs/JobStatusBadge';
 import { useJobsReport } from '@/hooks/useReports';
-import { useBranches } from '@/hooks/useBranches';
 import { useBranchStore } from '@/stores/branchStore';
 import { formatDate } from '@/lib/utils/dates';
 import { formatINR } from '@/lib/utils/currency';
@@ -22,7 +21,6 @@ export default function ReportsPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  const { data: branches } = useBranches();
   const { data: jobs, isLoading } = useJobsReport({
     branch_id: selectedBranchId || undefined,
     status: statusFilter || undefined,

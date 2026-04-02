@@ -1,40 +1,68 @@
 'use client';
 
-import { ReactNode, memo } from 'react';
+import { ReactNode, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { useAuth } from '@/hooks/useAuth';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+import { useAuthStore } from '@/stores/authStore';
 
-const LoadingSpinner = memo(() => (
-  <div className="flex h-screen items-center justify-center bg-gray-50">
-    <div className="text-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-      <p className="mt-4 text-gray-600">Loading...</p>
-    </div>
-  </div>
-));
+function AuthGate({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const isLoading = useAuthStore((s) => s.isLoading);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
-LoadingSpinner.displayName = 'LoadingSpinner';
+  useEffect(() => {
+    // Once the session check completes, redirect if not authenticated
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isLoading, isAuthenticated, router]);
+
+  // Brief skeleton while session check runs (usually < 300ms)
+  if (isLoading) {
+    return (
+      <div className="flex h-screen overflow-hidden bg-gray-50">
+        {/* Sidebar skeleton */}
+        <div className="hidden lg:flex w-64 flex-col bg-white border-r border-gray-200 animate-pulse">
+          <div className="p-4 border-b">
+            <div className="h-6 w-28 bg-gray-200 rounded mb-2" />
+            <div className="h-3 w-40 bg-gray-100 rounded" />
+          </div>
+          <div className="flex-1 p-4 space-y-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-9 bg-gray-100 rounded-lg" />
+            ))}
+          </div>
+        </div>
+        {/* Content skeleton */}
+        <div className="flex-1 bg-gray-50" />
+      </div>
+    );
+  }
+
+  // Redirect pending (not authenticated)
+  if (!isAuthenticated) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-50">
+        <p className="text-sm text-gray-500">Redirecting to login…</p>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  const { user, isLoading } = useAuth();
-
-  // Show loading state only during initial auth check
-  if (isLoading) {
-    return <LoadingSpinner />;
-  }
-
-  // If not authenticated, the middleware will redirect
-  // Don't show a loading state here to avoid confusion
-  if (!user) {
-    return null;
-  }
-
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto bg-gray-50 text-gray-900">
-        {children}
-      </main>
-    </div>
+    <AuthGate>
+      <div className="flex h-screen overflow-hidden bg-gray-50">
+        <Sidebar />
+        <main className="flex-1 overflow-y-auto bg-gray-50 text-gray-900">
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
+        </main>
+      </div>
+    </AuthGate>
   );
 }

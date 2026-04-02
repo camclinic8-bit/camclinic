@@ -100,6 +100,20 @@ export async function updateJobCharges(
     advance_paid_date?: string | null;
   }
 ): Promise<void> {
+  if (charges.advance_paid !== undefined) {
+    const { data: row, error: fetchError } = await supabase
+      .from('jobs')
+      .select('grand_total')
+      .eq('id', jobId)
+      .single();
+    if (fetchError) throw fetchError;
+    const grandTotal = Number(row?.grand_total ?? 0);
+    const advance = Number(charges.advance_paid);
+    if (advance > grandTotal + 0.005) {
+      throw new Error('Total amount collected cannot exceed the grand total for this job.');
+    }
+  }
+
   const { error } = await supabase
     .from('jobs')
     .update(charges)

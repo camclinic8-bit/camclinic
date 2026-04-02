@@ -1,17 +1,20 @@
 'use client';
 
-import { use } from 'react';
+import { use, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  ArrowLeft, 
-  Edit, 
-  FileText, 
-  Download,
+import {
+  ArrowLeft,
+  Edit,
+  FileText,
   User,
   MapPin,
   Calendar,
-  Phone
+  Phone,
+  CreditCard,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
@@ -21,23 +24,87 @@ import { Badge } from '@/components/ui/Badge';
 import { JobStatusBadge } from '@/components/jobs/JobStatusBadge';
 import { JobPriorityBadge } from '@/components/jobs/JobPriorityBadge';
 import { useJob, useUpdateJobStatus } from '@/hooks/useJobs';
+import { useUpdateJobCharges } from '@/hooks/useBilling';
 import { useAuth } from '@/hooks/useAuth';
 import { formatDate, formatDateTime, isExpired } from '@/lib/utils/dates';
 import { formatINR } from '@/lib/utils/currency';
 import { generateReceipt, generateQuote, generateInvoice, downloadPDF } from '@/lib/utils/pdf';
 import { JOB_STATUS_LABELS, PRODUCT_CONDITION_LABELS, JobStatus } from '@/types/enums';
+import { toast } from 'sonner';
+
+function roundMoney(n: number): number {
+  return Math.round(n * 100) / 100;
+}
 
 export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const { data: job, isLoading } = useJob(id);
   const updateStatus = useUpdateJobStatus();
+  const updateCharges = useUpdateJobCharges(id);
   const { canSetAnyStatus } = useAuth();
+
+  const [showPaymentInput, setShowPaymentInput] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState('');
 
   const handleStatusChange = async (newStatus: JobStatus) => {
     if (!job) return;
     await updateStatus.mutateAsync({ id: job.id, status: newStatus });
   };
+
+  const handleRecordPayment = async () => {
+    if (!job) return;
+    const maxPay = roundMoney(job.balance_amount);
+    const amount = roundMoney(parseFloat(paymentAmount));
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Enter a valid amount greater than zero.');
+      return;
+    }
+    if (amount > maxPay) {
+      toast.error(`You can collect at most ${formatINR(maxPay)} (current balance due).`);
+      return;
+    }
+    const newAdvance = roundMoney((job.advance_paid || 0) + amount);
+    await updateCharges.mutateAsync({
+      advance_paid: newAdvance,
+      advance_paid_date: new Date().toISOString().split('T')[0],
+    });
+    setPaymentAmount('');
+    setShowPaymentInput(false);
+  };
+
+  const handlePaymentAmountChange = (raw: string, balanceDue: number) => {
+    if (raw === '') {
+      setPaymentAmount('');
+      return;
+    }
+    const n = parseFloat(raw);
+    if (isNaN(n)) {
+      setPaymentAmount(raw);
+      return;
+    }
+    const maxPay = roundMoney(balanceDue);
+    if (n < 0) {
+      setPaymentAmount('0');
+      return;
+    }
+    if (n > maxPay) {
+      setPaymentAmount(
+        Number.isInteger(maxPay) ? String(maxPay) : maxPay.toFixed(2)
+      );
+      return;
+    }
+    setPaymentAmount(raw);
+  };
+
+  const paymentStatus =
+    !job
+      ? null
+      : job.balance_amount <= 0
+      ? 'paid'
+      : job.advance_paid > 0
+      ? 'partial'
+      : 'unpaid';
 
   const handleDownloadReceipt = () => {
     if (!job) return;
@@ -108,7 +175,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         <div className="max-w-4xl mx-auto space-y-6">
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="outline" size="sm" onClick={() => router.back()}>
+              <Button variant="outline" size="sm" onClick={() => router.push('/jobs')}>
                 <ArrowLeft className="h-4 w-4" />
               </Button>
               <div>
@@ -152,43 +219,112 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   <CardTitle>Products</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {job.products?.map((product, index) => (
-                    <div key={product.id} className="p-4 border rounded-lg">
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-medium">
-                          {product.brand} {product.model}
-                        </h4>
-                        {product.condition && (
-                          <Badge variant="gray">
-                            {PRODUCT_CONDITION_LABELS[product.condition]}
-                          </Badge>
-                        )}
-                      </div>
-                      {product.serial_number && (
-                        <p className="text-sm text-gray-600">S/N: {product.serial_number}</p>
-                      )}
-                      {product.remarks && (
-                        <p className="text-sm text-gray-500 mt-2">{product.remarks}</p>
-                      )}
-                      {product.accessories && product.accessories.length > 0 && (
-                        <div className="mt-2">
-                          <span className="text-xs text-gray-500">Accessories: </span>
-                          <span className="text-sm">{product.accessories.map(a => a.name).join(', ')}</span>
-                        </div>
-                      )}
-                      {product.has_warranty && (
-                        <div className="mt-2 p-2 bg-yellow-50 rounded text-sm">
-                          <span className="font-medium">Warranty: </span>
-                          {product.warranty_description}
-                          {product.warranty_expiry_date && (
-                            <span className={isExpired(product.warranty_expiry_date) ? 'text-red-600' : ''}>
-                              {' '}(Expires: {formatDate(product.warranty_expiry_date)})
-                            </span>
+                  {job.products && job.products.length > 0 ? (
+                    job.products.map((product, index) => (
+                      <div key={product.id} className="p-4 border rounded-lg space-y-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">Product #{index + 1}</p>
+                            <h4 className="font-semibold text-base text-gray-900">
+                              {[product.brand, product.model].filter(Boolean).join(' ') || 'Unnamed Product'}
+                            </h4>
+                          </div>
+                          {product.condition ? (
+                            <Badge variant="gray">
+                              {PRODUCT_CONDITION_LABELS[product.condition]}
+                            </Badge>
+                          ) : (
+                            <Badge variant="gray">Condition Not Set</Badge>
                           )}
                         </div>
-                      )}
-                    </div>
-                  ))}
+
+                        <div className="grid sm:grid-cols-2 gap-3 text-sm">
+                          <div className="rounded-md bg-gray-50 p-3">
+                            <p className="text-xs text-gray-500">Brand</p>
+                            <p className="font-medium text-gray-900">{product.brand || '-'}</p>
+                          </div>
+                          <div className="rounded-md bg-gray-50 p-3">
+                            <p className="text-xs text-gray-500">Model</p>
+                            <p className="font-medium text-gray-900">{product.model || '-'}</p>
+                          </div>
+                          <div className="rounded-md bg-gray-50 p-3">
+                            <p className="text-xs text-gray-500">Serial Number</p>
+                            <p className="font-medium text-gray-900">{product.serial_number || '-'}</p>
+                          </div>
+                          <div className="rounded-md bg-gray-50 p-3">
+                            <p className="text-xs text-gray-500">Warranty</p>
+                            <p className="font-medium text-gray-900">{product.has_warranty ? 'Yes' : 'No'}</p>
+                          </div>
+                        </div>
+
+                        {product.description && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">Product Description</p>
+                            <p className="text-sm text-gray-700 bg-gray-50 rounded-md p-3">{product.description}</p>
+                          </div>
+                        )}
+
+                        {product.remarks && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">Remarks</p>
+                            <p className="text-sm text-gray-700 bg-gray-50 rounded-md p-3">{product.remarks}</p>
+                          </div>
+                        )}
+
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Accessories</p>
+                          {product.accessories && product.accessories.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {product.accessories.map((a, idx) => (
+                                <span
+                                  key={typeof a === 'string' ? `${product.id}-acc-${idx}` : a.id}
+                                  className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
+                                >
+                                  {typeof a === 'string' ? a : a.name}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-500">No accessories added</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Other Parts</p>
+                          {product.other_parts && product.other_parts.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {product.other_parts.map((o, idx) => (
+                                <span
+                                  key={typeof o === 'string' ? `${product.id}-part-${idx}` : o.id}
+                                  className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200"
+                                >
+                                  {typeof o === 'string' ? o : o.name}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-500">No other parts added</p>
+                          )}
+                        </div>
+
+                        {product.has_warranty && (
+                          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md text-sm">
+                            <p className="font-medium text-yellow-900">Warranty Details</p>
+                            <p className="text-yellow-800 mt-1">
+                              {product.warranty_description || 'Warranty marked, description not provided'}
+                            </p>
+                            {product.warranty_expiry_date && (
+                              <p className={`mt-1 ${isExpired(product.warranty_expiry_date) ? 'text-red-600' : 'text-yellow-900'}`}>
+                                Expires: {formatDate(product.warranty_expiry_date)}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-500">No products are attached to this job.</p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -293,7 +429,27 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Charges</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Charges</CardTitle>
+                    {paymentStatus === 'paid' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Paid
+                      </span>
+                    )}
+                    {paymentStatus === 'partial' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">
+                        <Clock className="h-3.5 w-3.5" />
+                        Partially Paid
+                      </span>
+                    )}
+                    {paymentStatus === 'unpaid' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        Unpaid
+                      </span>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2 text-sm">
@@ -306,17 +462,15 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                       <span>{formatINR(job.service_charges)}</span>
                     </div>
                     {job.spare_parts && job.spare_parts.length > 0 && (
-                      <>
-                        <div className="border-t pt-2 mt-2">
-                          <p className="text-gray-600 mb-1">Spare Parts:</p>
-                          {job.spare_parts.map((part) => (
-                            <div key={part.id} className="flex justify-between text-xs">
-                              <span>{part.name} x{part.quantity}</span>
-                              <span>{formatINR(part.total_price)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
+                      <div className="border-t pt-2 mt-2">
+                        <p className="text-gray-600 mb-1">Parts Used:</p>
+                        {job.spare_parts.map((part) => (
+                          <div key={part.id} className="flex justify-between text-xs">
+                            <span>{part.name} ×{part.quantity}</span>
+                            <span>{formatINR(part.total_price)}</span>
+                          </div>
+                        ))}
+                      </div>
                     )}
                     {job.gst_enabled && (
                       <div className="flex justify-between">
@@ -334,12 +488,80 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                         <span>-{formatINR(job.advance_paid)}</span>
                       </div>
                     )}
-                    <div className="flex justify-between font-bold text-lg border-t pt-2">
-                      <span>Balance</span>
+                    <div className="flex justify-between font-bold text-base border-t pt-2">
+                      <span>Balance Due</span>
                       <span className={job.balance_amount > 0 ? 'text-red-600' : 'text-green-600'}>
                         {formatINR(job.balance_amount)}
                       </span>
                     </div>
+
+                    {/* Record Payment */}
+                    {job.balance_amount > 0 && (
+                      <div className="pt-2">
+                        {showPaymentInput ? (
+                          <div className="space-y-2">
+                            <div className="flex gap-2">
+                              <input
+                                type="number"
+                                min={0}
+                                max={job.balance_amount}
+                                step="0.01"
+                                inputMode="decimal"
+                                value={paymentAmount}
+                                onChange={(e) =>
+                                  handlePaymentAmountChange(e.target.value, job.balance_amount)
+                                }
+                                placeholder={`Max ${formatINR(job.balance_amount)}`}
+                                className="flex-1 border rounded px-2 py-1.5 text-sm"
+                                onKeyDown={(e) => e.key === 'Enter' && handleRecordPayment()}
+                                autoFocus
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={handleRecordPayment}
+                                isLoading={updateCharges.isPending}
+                                disabled={(() => {
+                                  const v = roundMoney(parseFloat(paymentAmount));
+                                  const maxPay = roundMoney(job.balance_amount);
+                                  return (
+                                    !paymentAmount.trim() ||
+                                    isNaN(v) ||
+                                    v <= 0 ||
+                                    v > maxPay
+                                  );
+                                })()}
+                              >
+                                Save
+                              </Button>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="w-full"
+                              onClick={() => {
+                                setShowPaymentInput(false);
+                                setPaymentAmount('');
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => setShowPaymentInput(true)}
+                          >
+                            <CreditCard className="h-4 w-4 mr-2" />
+                            Record Payment
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

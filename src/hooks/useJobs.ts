@@ -19,29 +19,32 @@ import { toast } from 'sonner';
 export function useJobs(filters?: JobFilters, page = 1, pageSize = 20) {
   const supabase = createClient();
   const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   // For technicians, override filters to only show their assigned jobs
-  const actualFilters = user?.role === 'technician' 
-    ? { ...filters, assignedTechnicianId: user.id }
+  const actualFilters = user?.role === 'technician'
+    ? { ...filters, technician_id: user.id }
     : filters;
 
   return useQuery({
-    queryKey: ['jobs', actualFilters, page.toString(), pageSize.toString(), user?.role, user?.id],
+    queryKey: ['jobs', actualFilters, page.toString(), pageSize.toString()],
     queryFn: () => getJobs(supabase, actualFilters, page, pageSize),
-    staleTime: 60 * 1000, // 1 minute
+    placeholderData: (previousData) => previousData,
+    staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
-    enabled: !!user,
+    enabled: isAuthenticated, // unblocks as soon as session confirmed
   });
 }
 
 export function useJob(id: string) {
   const supabase = createClient();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: ['job', id],
     queryFn: () => getJobById(supabase, id),
     staleTime: 60 * 1000, // 1 minute
-    enabled: !!id,
+    enabled: !!id && isAuthenticated,
   });
 }
 
@@ -118,26 +121,26 @@ export function useUpdateJobStatus() {
 
 export function useJobCounts(branchId?: string) {
   const supabase = createClient();
-  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
-    queryKey: ['jobCounts', branchId, user?.role, user?.id],
+    queryKey: ['jobCounts', branchId],
     queryFn: () => getJobCounts(supabase, branchId),
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
-    enabled: !!user,
+    enabled: isAuthenticated,
   });
 }
 
 export function useJobsDueToday(branchId?: string) {
   const supabase = createClient();
-  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
-    queryKey: ['jobsDueToday', branchId, user?.role, user?.id],
+    queryKey: ['jobsDueToday', branchId],
     queryFn: () => getJobsDueToday(supabase, branchId),
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
-    enabled: !!user,
+    enabled: isAuthenticated,
   });
 }

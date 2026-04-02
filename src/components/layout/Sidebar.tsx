@@ -2,17 +2,16 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  Briefcase, 
-  Users, 
-  Wrench, 
-  Building2, 
-  BarChart3, 
-  Settings,
+import {
+  LayoutDashboard,
+  Briefcase,
+  Users,
+  Users2,
+  Building2,
+  BarChart3,
   LogOut,
   Menu,
-  X
+  X,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
@@ -22,23 +21,22 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Jobs', href: '/jobs', icon: Briefcase },
   { name: 'Customers', href: '/customers', icon: Users },
-  { name: 'Technicians', href: '/technicians', icon: Wrench, roles: ['super_admin', 'service_manager', 'service_incharge'] },
+  { name: 'Team', href: '/technicians', icon: Users2, roles: ['super_admin', 'service_manager', 'service_incharge'] },
   { name: 'Branches', href: '/branches', icon: Building2, roles: ['super_admin', 'service_manager', 'service_incharge'] },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
-  { name: 'Settings', href: '/settings', icon: Settings, roles: ['super_admin'] },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { user, signOut, isSuperAdmin, isServiceManager, isServiceIncharge, isTechnician } = useAuth();
+  const { user, signOut } = useAuth();
   const { sidebarOpen, toggleSidebar } = useUIStore();
 
+  // While user profile loads, show all nav items (middleware already verified auth).
+  // Once loaded, filter by role.
   const filteredNavigation = navigation.filter(item => {
-    // If no roles specified, show to everyone
     if (!item.roles) return true;
-    
-    // Check if user's role is in the allowed roles
-    return item.roles.includes(user?.role || '');
+    if (!user) return true; // profile still loading — show all temporarily
+    return item.roles.includes(user.role);
   });
 
   return (
@@ -65,13 +63,14 @@ export function Sidebar() {
       `}>
         <div className="flex flex-col h-full">
           <div className="p-4 border-b">
-            <h1 className="text-xl font-bold text-blue-600">Cam Clinic</h1>
+            <h1 className="text-xl font-bold text-blue-600">CamClinic</h1>
             <p className="text-xs text-gray-500 mt-1">Camera Service Management</p>
           </div>
 
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
             {filteredNavigation.map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              const isActive =
+                pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <Link
                   key={item.name}
@@ -96,12 +95,21 @@ export function Sidebar() {
 
           <div className="p-4 border-t">
             <div className="mb-3">
-              <p className="text-sm font-medium text-gray-900">{user?.full_name}</p>
-              <p className="text-xs text-gray-500 capitalize">{user?.role?.replace(/_/g, ' ')}</p>
+              {user ? (
+                <>
+                  <p className="text-sm font-medium text-gray-900">{user.full_name}</p>
+                  <p className="text-xs text-gray-500 capitalize">{user.role.replace(/_/g, ' ')}</p>
+                </>
+              ) : (
+                <>
+                  <div className="h-4 w-28 bg-gray-200 rounded animate-pulse mb-1" />
+                  <div className="h-3 w-20 bg-gray-100 rounded animate-pulse" />
+                </>
+              )}
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               className="w-full justify-start"
               onClick={signOut}
             >

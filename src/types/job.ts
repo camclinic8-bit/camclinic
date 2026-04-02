@@ -129,6 +129,8 @@ export interface JobProductInput {
 export interface JobUpdateInput {
   status?: JobStatus;
   priority?: JobPriority;
+  service_branch_id?: string;
+  delivery_branch_id?: string;
   assigned_incharge_id?: string | null;
   assigned_technician_id?: string | null;
   description?: string | null;
@@ -151,4 +153,6 @@ export interface JobFilters {
   date_from?: string;
   date_to?: string;
   search?: string;
+  sort_by?: 'created_at' | 'updated_at' | 'estimate_delivery_date' | 'job_number' | 'grand_total' | 'balance_amount' | 'status' | 'priority';
+  sort_order?: 'asc' | 'desc';
 }

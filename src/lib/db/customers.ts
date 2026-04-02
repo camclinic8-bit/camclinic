@@ -4,6 +4,15 @@ import { Customer, CustomerWithJobCount } from '@/types/customer';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TypedSupabaseClient = SupabaseClient<any>;
 
+/** Trim and require non-empty phone (DB column is NOT NULL). */
+function normalizeRequiredPhone(phone: string): string {
+  const t = phone.trim();
+  if (!t) {
+    throw new Error('Phone number is required');
+  }
+  return t;
+}
+
 export async function getCustomers(
   supabase: TypedSupabaseClient,
   search?: string,
@@ -74,12 +83,17 @@ export async function createCustomer(
   },
   shopId: string
 ): Promise<Customer> {
+  const phone = normalizeRequiredPhone(input.phone);
+  const name = input.name.trim();
+  if (!name) {
+    throw new Error('Customer name is required');
+  }
   const { data, error } = await supabase
     .from('customers')
     .insert({
       shop_id: shopId,
-      name: input.name,
-      phone: input.phone,
+      name,
+      phone,
       email: input.email,
       address: input.address,
     })
@@ -101,9 +115,19 @@ export async function updateCustomer(
     address?: string | null;
   }
 ): Promise<Customer> {
+  const payload = { ...input };
+  if (payload.phone !== undefined) {
+    payload.phone = normalizeRequiredPhone(payload.phone);
+  }
+  if (payload.name !== undefined) {
+    payload.name = payload.name.trim();
+    if (!payload.name) {
+      throw new Error('Customer name is required');
+    }
+  }
   const { data, error } = await supabase
     .from('customers')
-    .update(input)
+    .update(payload)
     .eq('id', id)
     .select()
     .single();

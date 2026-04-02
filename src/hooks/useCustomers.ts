@@ -2,10 +2,9 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
-import { 
-  getCustomers, 
-  getCustomerById, 
-  searchCustomers, 
+import {
+  getCustomers,
+  searchCustomers,
   createCustomer, 
   updateCustomer,
   getCustomerWithJobCount 
@@ -15,14 +14,14 @@ import { toast } from 'sonner';
 
 export function useCustomers(page = 1, pageSize = 20, search?: string) {
   const supabase = createClient();
-  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
-    queryKey: ['customers', page.toString(), pageSize.toString(), search, user?.role, user?.id],
+    queryKey: ['customers', page.toString(), pageSize.toString(), search],
     queryFn: () => getCustomers(supabase, search, page, pageSize),
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
-    enabled: !!user,
+    enabled: isAuthenticated,
   });
 }
 

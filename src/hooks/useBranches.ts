@@ -15,23 +15,31 @@ import { toast } from 'sonner';
 
 export function useBranches() {
   const supabase = createClient();
-  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
-    queryKey: ['branches', user?.role, user?.branch_id],
+    queryKey: ['branches'],
     queryFn: () => getBranches(supabase),
-    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    enabled: isAuthenticated,
   });
 }
 
 export function useAllBranches() {
   const supabase = createClient();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const user = useAuthStore((state) => state.user);
 
   return useQuery({
-    queryKey: ['allBranches', user?.role, user?.branch_id],
+    queryKey: ['allBranches'],
     queryFn: () => getAllBranches(supabase),
-    enabled: !!user && (user?.role === 'super_admin' || user?.role === 'service_manager' || user?.role === 'service_incharge'),
+    staleTime: 5 * 60 * 1000,
+    enabled: isAuthenticated && (
+      !user || // load even before profile, show all once available
+      user.role === 'super_admin' ||
+      user.role === 'service_manager' ||
+      user.role === 'service_incharge'
+    ),
   });
 }
 

@@ -47,13 +47,22 @@ export default function CustomersPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const phone = formData.phone.trim();
+    if (!phone) {
+      toast.error('Phone number is required');
+      return;
+    }
+    const name = formData.name.trim();
+    if (!name) {
+      toast.error('Customer name is required');
+      return;
+    }
+    const payload = { ...formData, name, phone };
     try {
       if (editingCustomer) {
-        await updateCustomer.mutateAsync({ id: editingCustomer.id, input: formData });
-        toast.success('Customer updated successfully');
+        await updateCustomer.mutateAsync({ id: editingCustomer.id, input: payload });
       } else {
-        await createCustomer.mutateAsync(formData);
-        toast.success('Customer created successfully');
+        await createCustomer.mutateAsync(payload);
       }
       handleCloseModal();
     } catch (error) {
@@ -196,7 +205,8 @@ export default function CustomersPage() {
             value={formData.phone}
             onChange={(e) => setFormData(d => ({ ...d, phone: e.target.value }))}
             required
-            placeholder="Phone number"
+            placeholder="Phone number (required)"
+            autoComplete="tel"
           />
           <Input
             label="Email"

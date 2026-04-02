@@ -18,22 +18,19 @@ export async function getJobs(
   page = 1,
   pageSize = 20
 ): Promise<{ data: JobWithRelations[]; count: number }> {
+  const sortBy = filters?.sort_by || 'created_at';
+  const sortOrder = filters?.sort_order || 'desc';
+
   let query = supabase
     .from('jobs')
     .select(`
       *,
-      customer:customers(*),
-      service_branch:branches!jobs_service_branch_id_fkey(*),
-      delivery_branch:branches!jobs_delivery_branch_id_fkey(*),
-      assigned_incharge:profiles!jobs_assigned_incharge_id_fkey(*),
-      assigned_technician:profiles!jobs_assigned_technician_id_fkey(*),
-      created_by_user:profiles!jobs_created_by_fkey(*),
-      products:job_products(
-        *,
-        accessories:product_accessories(*),
-        other_parts:product_other_parts(*)
-      ),
-      spare_parts(*)
+      customer:customers(id, name, phone, email),
+      service_branch:branches!jobs_service_branch_id_fkey(id, name),
+      delivery_branch:branches!jobs_delivery_branch_id_fkey(id, name),
+      assigned_incharge:profiles!jobs_assigned_incharge_id_fkey(id, full_name, phone),
+      assigned_technician:profiles!jobs_assigned_technician_id_fkey(id, full_name, phone),
+      created_by_user:profiles!jobs_created_by_fkey(id, full_name)
     `, { count: 'exact' });
 
   if (filters?.status) {
@@ -80,6 +77,7 @@ export async function getJobs(
   const to = from + pageSize - 1;
 
   const { data, error, count } = await query
+    .order(sortBy, { ascending: sortOrder === 'asc', nullsFirst: false })
     .order('created_at', { ascending: false })
     .range(from, to);
 

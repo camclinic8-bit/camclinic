@@ -41,10 +41,16 @@ export function TableCell({ children, className = '' }: { children: ReactNode; c
   return <td className={`px-4 py-3 text-sm text-gray-900 ${className}`}>{children}</td>;
 }
 
-export function TableEmpty({ message = 'No data available' }: { message?: string }) {
+export function TableEmpty({
+  message = 'No data available',
+  colSpan = 100,
+}: {
+  message?: string;
+  colSpan?: number;
+}) {
   return (
     <tr>
-      <td colSpan={100} className="px-4 py-8 text-center text-sm text-gray-500">
+      <td colSpan={colSpan} className="px-4 py-8 text-center text-sm text-gray-500">
         {message}
       </td>
     </tr>
