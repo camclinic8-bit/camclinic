@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, useFieldArray, Controller, type Resolver } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -41,6 +41,8 @@ import {
   deleteProduct,
   updateProduct,
 } from '@/lib/db/products';
+import { normalizeJobProductWarrantyForDb } from '@/lib/utils/normalizeJobProduct';
+import { nonNegativeNumberOrZero, optionalDateInput } from '@/lib/validation/optionalFields';
 
 // ─── Zod Schemas ─────────────────────────────────────────────────────────────
 
@@ -81,12 +83,12 @@ const editJobSchema = z.object({
   description: z.string().optional(),
   technician_notes: z.string().optional(),
   cam_clinic_advisory_notes: z.string().optional(),
-  inspection_fee: z.number().min(0),
-  service_charges: z.number().min(0),
-  advance_paid: z.number().min(0),
-  advance_paid_date: z.string().optional(),
+  inspection_fee: nonNegativeNumberOrZero,
+  service_charges: nonNegativeNumberOrZero,
+  advance_paid: nonNegativeNumberOrZero,
+  advance_paid_date: optionalDateInput,
   gst_enabled: z.boolean(),
-  estimate_delivery_date: z.string().optional(),
+  estimate_delivery_date: optionalDateInput,
   products: z.array(productSchema).min(1, 'At least one product is required'),
 });
 
@@ -200,10 +202,11 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
     setValue,
     formState: { errors, isSubmitting },
   } = useForm<EditJobFormData>({
-    resolver: zodResolver(editJobSchema),
+    resolver: zodResolver(editJobSchema) as Resolver<EditJobFormData>,
+    shouldUnregister: true,
     defaultValues: {
       gst_enabled: false,
-      products: [{}],
+      products: [{ has_warranty: false }],
     },
   });
 
@@ -350,6 +353,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
       );
 
       await Promise.all(data.products.map(async (product) => {
+        const w = normalizeJobProductWarrantyForDb(product);
         const productPayload = {
           brand: toNull(product.brand),
           model: toNull(product.model),
@@ -357,9 +361,9 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
           condition: (product.condition as ProductCondition) || null,
           description: toNull(product.description),
           remarks: toNull(product.remarks),
-          has_warranty: Boolean(product.has_warranty),
-          warranty_description: toNull(product.warranty_description),
-          warranty_expiry_date: product.warranty_expiry_date || null,
+          has_warranty: w.has_warranty,
+          warranty_description: w.warranty_description,
+          warranty_expiry_date: w.warranty_expiry_date,
         };
 
         let productId = product.id;
@@ -404,12 +408,15 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
           description: data.description || null,
           technician_notes: data.technician_notes || null,
           cam_clinic_advisory_notes: data.cam_clinic_advisory_notes || null,
-          inspection_fee: data.inspection_fee,
-          service_charges: data.service_charges,
-          advance_paid: data.advance_paid,
-          advance_paid_date: data.advance_paid > 0 ? (data.advance_paid_date || null) : null,
+          inspection_fee: data.inspection_fee ?? 0,
+          service_charges: data.service_charges ?? 0,
+          advance_paid: data.advance_paid ?? 0,
+          advance_paid_date:
+            data.advance_paid && data.advance_paid > 0
+              ? data.advance_paid_date?.trim() || null
+              : null,
           gst_enabled: data.gst_enabled,
-          estimate_delivery_date: data.estimate_delivery_date || null,
+          estimate_delivery_date: data.estimate_delivery_date?.trim() || null,
         },
       });
 
@@ -658,29 +665,29 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
               <div className="grid md:grid-cols-3 gap-4">
                 <Input
                   type="number"
-                  label="Inspection Fee (₹)"
+                  label="Inspection Fee (₹) (optional)"
                   {...register('inspection_fee', { valueAsNumber: true })}
                 />
                 <Input
                   type="number"
-                  label="Service Charges (₹)"
+                  label="Service Charges (₹) (optional)"
                   {...register('service_charges', { valueAsNumber: true })}
                 />
                 <Input
                   type="date"
-                  label="Estimate Delivery"
+                  label="Estimate Delivery (optional)"
                   {...register('estimate_delivery_date')}
                 />
               </div>
               <div className="grid md:grid-cols-2 gap-4">
                 <Input
                   type="number"
-                  label="Advance Paid (₹)"
+                  label="Advance Paid (₹) (optional)"
                   {...register('advance_paid', { valueAsNumber: true })}
                 />
                 <Input
                   type="date"
-                  label="Advance Paid Date"
+                  label="Advance Paid Date (optional)"
                   {...register('advance_paid_date')}
                 />
               </div>
@@ -705,7 +712,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => append({})}
+                onClick={() => append({ has_warranty: false })}
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Add Product
@@ -791,18 +798,41 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id={`products.${index}.has_warranty`}
-                        className="rounded border-gray-300"
-                        {...register(`products.${index}.has_warranty`)}
+                      <Controller
+                        control={control}
+                        name={`products.${index}.has_warranty`}
+                        defaultValue={false}
+                        render={({ field }) => (
+                          <>
+                            <input
+                              type="checkbox"
+                              id={`products.${index}.has_warranty`}
+                              className="rounded border-gray-300"
+                              checked={!!field.value}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                field.onChange(checked);
+                                if (!checked) {
+                                  setValue(`products.${index}.warranty_description`, '', {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                  });
+                                  setValue(`products.${index}.warranty_expiry_date`, '', {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                  });
+                                }
+                              }}
+                            />
+                            <label
+                              htmlFor={`products.${index}.has_warranty`}
+                              className="text-sm font-medium text-gray-700"
+                            >
+                              Has Warranty
+                            </label>
+                          </>
+                        )}
                       />
-                      <label
-                        htmlFor={`products.${index}.has_warranty`}
-                        className="text-sm font-medium text-gray-700"
-                      >
-                        Has Warranty
-                      </label>
                     </div>
                     {/* eslint-disable-next-line react-hooks/incompatible-library -- RHF watch for conditional warranty fields */}
                     {watch(`products.${index}.has_warranty`) && (

@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { normalizeJobProductWarrantyForDb } from '@/lib/utils/normalizeJobProduct';
 import { 
   Job, 
   JobWithRelations, 
@@ -199,10 +200,13 @@ export async function createJob(
       assigned_technician_id: input.assigned_technician_id,
       priority: input.priority,
       description: input.description,
-      inspection_fee: input.inspection_fee || 0,
-      advance_paid: input.advance_paid || 0,
-      advance_paid_date: input.advance_paid && input.advance_paid > 0 ? input.advance_paid_date : null,
-      estimate_delivery_date: input.estimate_delivery_date,
+      inspection_fee: input.inspection_fee ?? 0,
+      advance_paid: input.advance_paid ?? 0,
+      advance_paid_date:
+        input.advance_paid && input.advance_paid > 0
+          ? input.advance_paid_date?.trim() || null
+          : null,
+      estimate_delivery_date: input.estimate_delivery_date?.trim() || null,
       created_by: createdBy,
       status: 'new',
     })
@@ -213,6 +217,7 @@ export async function createJob(
 
   // Create job products
   for (const product of input.products) {
+    const w = normalizeJobProductWarrantyForDb(product);
     const { data: jobProduct, error: productError } = await supabase
       .from('job_products')
       .insert({
@@ -223,9 +228,9 @@ export async function createJob(
         condition: product.condition,
         description: product.description,
         remarks: product.remarks,
-        has_warranty: product.has_warranty || false,
-        warranty_description: product.warranty_description,
-        warranty_expiry_date: product.warranty_expiry_date,
+        has_warranty: w.has_warranty,
+        warranty_description: w.warranty_description,
+        warranty_expiry_date: w.warranty_expiry_date,
       })
       .select()
       .single();

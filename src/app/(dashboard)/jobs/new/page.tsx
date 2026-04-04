@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, useFieldArray, Controller, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Plus, Trash2, Search } from 'lucide-react';
@@ -19,6 +19,7 @@ import { useTechnicians, useServiceIncharges } from '@/hooks/useTechnicians';
 import { JOB_PRIORITY_LABELS, PRODUCT_CONDITION_LABELS, ProductCondition } from '@/types/enums';
 import { Customer } from '@/types/customer';
 import { toast } from 'sonner';
+import { optionalDateInput, optionalNonNegativeNumber } from '@/lib/validation/optionalFields';
 
 const productSchema = z.object({
   brand: z.string().optional(),
@@ -42,10 +43,10 @@ const jobSchema = z.object({
   assigned_technician_id: z.string().optional(),
   priority: z.enum(['immediate', 'high', 'medium', 'low']),
   description: z.string().optional(),
-  inspection_fee: z.number().min(0).optional(),
-  advance_paid: z.number().min(0).optional(),
-  advance_paid_date: z.string().optional(),
-  estimate_delivery_date: z.string().optional(),
+  inspection_fee: optionalNonNegativeNumber,
+  advance_paid: optionalNonNegativeNumber,
+  advance_paid_date: optionalDateInput,
+  estimate_delivery_date: optionalDateInput,
   products: z.array(productSchema).min(1, 'At least one product is required'),
 });
 
@@ -73,10 +74,11 @@ export default function NewJobPage() {
     watch,
     formState: { errors, isSubmitting },
   } = useForm<JobFormData>({
-    resolver: zodResolver(jobSchema),
+    resolver: zodResolver(jobSchema) as Resolver<JobFormData>,
+    shouldUnregister: true,
     defaultValues: {
       priority: 'medium',
-      products: [{}],
+      products: [{ has_warranty: false }],
     },
   });
 
@@ -143,6 +145,10 @@ export default function NewJobPage() {
         ...data,
         assigned_incharge_id: data.assigned_incharge_id || null,
         assigned_technician_id: data.assigned_technician_id || null,
+        inspection_fee: data.inspection_fee ?? 0,
+        advance_paid: data.advance_paid ?? 0,
+        advance_paid_date: data.advance_paid_date?.trim() || null,
+        estimate_delivery_date: data.estimate_delivery_date?.trim() || null,
         products: data.products.map(p => ({
           ...p,
           condition: p.condition as ProductCondition || null,
@@ -314,17 +320,17 @@ export default function NewJobPage() {
               <div className="grid md:grid-cols-3 gap-4">
                 <Input
                   type="number"
-                  label="Inspection Fee (₹)"
+                  label="Inspection Fee (₹) (optional)"
                   {...register('inspection_fee', { valueAsNumber: true })}
                 />
                 <Input
                   type="number"
-                  label="Advance Paid (₹)"
+                  label="Advance Paid (₹) (optional)"
                   {...register('advance_paid', { valueAsNumber: true })}
                 />
                 <Input
                   type="date"
-                  label="Estimate Delivery"
+                  label="Estimate Delivery (optional)"
                   {...register('estimate_delivery_date')}
                 />
               </div>
@@ -348,7 +354,7 @@ export default function NewJobPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => append({})}
+                onClick={() => append({ has_warranty: false })}
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Add Product
@@ -440,15 +446,41 @@ export default function NewJobPage() {
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id={`products.${index}.has_warranty`}
-                        className="rounded border-gray-300"
-                        {...register(`products.${index}.has_warranty`)}
+                      <Controller
+                        control={control}
+                        name={`products.${index}.has_warranty`}
+                        defaultValue={false}
+                        render={({ field }) => (
+                          <>
+                            <input
+                              type="checkbox"
+                              id={`products.${index}.has_warranty`}
+                              className="rounded border-gray-300"
+                              checked={!!field.value}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                field.onChange(checked);
+                                if (!checked) {
+                                  setValue(`products.${index}.warranty_description`, '', {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                  });
+                                  setValue(`products.${index}.warranty_expiry_date`, '', {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                  });
+                                }
+                              }}
+                            />
+                            <label
+                              htmlFor={`products.${index}.has_warranty`}
+                              className="text-sm font-medium text-gray-700"
+                            >
+                              Has Warranty
+                            </label>
+                          </>
+                        )}
                       />
-                      <label htmlFor={`products.${index}.has_warranty`} className="text-sm font-medium text-gray-700">
-                        Has Warranty
-                      </label>
                     </div>
                     {/* eslint-disable-next-line react-hooks/incompatible-library -- RHF watch for conditional warranty fields */}
                     {watch(`products.${index}.has_warranty`) && (
