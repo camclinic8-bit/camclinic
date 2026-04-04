@@ -89,6 +89,7 @@ export default function NewJobPage() {
   const { fields, append, remove } = useFieldArray({
     control,
     name: 'products',
+    keyName: '_rhfId',
   });
 
   const priorityOptions = Object.entries(JOB_PRIORITY_LABELS).map(([value, label]) => ({
@@ -358,7 +359,9 @@ export default function NewJobPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => append({ has_warranty: false, accessories: [], other_parts: [] })}
+                onClick={() =>
+                  append({ has_warranty: false, accessories: [], other_parts: [] })
+                }
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Add Product
@@ -366,7 +369,7 @@ export default function NewJobPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               {fields.map((field, index) => (
-                <div key={field.id} className="p-4 border rounded-lg space-y-4">
+                <div key={field._rhfId} className="p-4 border rounded-lg space-y-4">
                   <div className="flex justify-between items-center">
                     <h4 className="font-medium">Product {index + 1}</h4>
                     {fields.length > 1 && (
