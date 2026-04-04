@@ -1,5 +1,18 @@
 import { z } from 'zod';
 
+/** Optional text/select values: RHF often sends `undefined` or `null` when fields unregister. */
+export const optionalStr = z.string().nullish();
+
+/**
+ * ChipInput / API data: accessory or part names must all be strings; legacy rows can have null names.
+ */
+export const chipStringArray = z.preprocess((val: unknown) => {
+  if (!Array.isArray(val)) return [];
+  return val
+    .map((x) => (typeof x === 'string' ? x.trim() : typeof x === 'number' ? String(x) : ''))
+    .filter((s) => s.length > 0);
+}, z.array(z.string()).default([]));
+
 /**
  * react-hook-form `valueAsNumber: true` yields NaN when the input is empty.
  * Optional fee/charge fields must treat NaN as "not provided".
@@ -12,8 +25,8 @@ export const optionalNonNegativeNumber = z
   )
   .pipe(z.number().min(0).optional());
 
-/** Dates are optional strings in the form; normalize empty → null in submit / DB layer. */
-export const optionalDateInput = z.string().optional();
+/** Date inputs; empty is often "" but can be undefined/null after conditional fields unregister. */
+export const optionalDateInput = z.string().nullish();
 
 /**
  * Empty or NaN → 0; always a number (edit job totals / billing fields).

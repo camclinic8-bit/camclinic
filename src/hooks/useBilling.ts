@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import {
   getSpareParts,
@@ -9,8 +9,15 @@ import {
   deleteSparePart,
   updateJobCharges,
 } from '@/lib/db/billing';
-import { SparePartInput } from '@/types/billing';
+import type { SparePart, SparePartInput } from '@/types/billing';
+import type { JobWithRelations } from '@/types/job';
 import { toast } from 'sonner';
+
+function syncJobSparePartsInCache(queryClient: QueryClient, jobId: string, spareParts: SparePart[]) {
+  queryClient.setQueryData<JobWithRelations>(['job', jobId], (old) =>
+    old ? { ...old, spare_parts: spareParts } : old
+  );
+}
 
 export function useSpareParts(jobId: string) {
   const supabase = createClient();
@@ -29,9 +36,13 @@ export function useAddSparePart(jobId: string) {
 
   return useMutation({
     mutationFn: (input: SparePartInput) => addSparePart(supabase, jobId, input),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['spareParts', jobId] });
-      queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+    onSuccess: (newPart) => {
+      queryClient.setQueryData<SparePart[]>(['spareParts', jobId], (old) => {
+        const next = old ? [...old, newPart] : [newPart];
+        return next.sort((a, b) => a.created_at.localeCompare(b.created_at));
+      });
+      const list = queryClient.getQueryData<SparePart[]>(['spareParts', jobId]);
+      if (list) syncJobSparePartsInCache(queryClient, jobId, list);
       toast.success('Part added');
     },
     onError: (error: Error) => {
@@ -47,9 +58,12 @@ export function useUpdateSparePart(jobId: string) {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: Partial<SparePartInput> }) =>
       updateSparePart(supabase, id, input),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['spareParts', jobId] });
-      queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+    onSuccess: (updated) => {
+      queryClient.setQueryData<SparePart[]>(['spareParts', jobId], (old) =>
+        old ? old.map((p) => (p.id === updated.id ? updated : p)) : [updated]
+      );
+      const list = queryClient.getQueryData<SparePart[]>(['spareParts', jobId]);
+      if (list) syncJobSparePartsInCache(queryClient, jobId, list);
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to update part');
@@ -63,9 +77,12 @@ export function useDeleteSparePart(jobId: string) {
 
   return useMutation({
     mutationFn: (id: string) => deleteSparePart(supabase, id, jobId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['spareParts', jobId] });
-      queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+    onSuccess: (_, deletedId) => {
+      queryClient.setQueryData<SparePart[]>(['spareParts', jobId], (old) =>
+        old ? old.filter((p) => p.id !== deletedId) : []
+      );
+      const list = queryClient.getQueryData<SparePart[]>(['spareParts', jobId]);
+      if (list) syncJobSparePartsInCache(queryClient, jobId, list);
       toast.success('Part removed');
     },
     onError: (error: Error) => {

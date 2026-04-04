@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useState, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, Controller, type Resolver } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { ChipInput } from '@/components/ui/ChipInput';
+import { ProductWarrantyFields } from '@/components/jobs/ProductWarrantyFields';
 import { useJob, useUpdateJob } from '@/hooks/useJobs';
 import { useBranches } from '@/hooks/useBranches';
 import { useTechnicians, useServiceIncharges } from '@/hooks/useTechnicians';
@@ -42,23 +43,28 @@ import {
   updateProduct,
 } from '@/lib/db/products';
 import { normalizeJobProductWarrantyForDb } from '@/lib/utils/normalizeJobProduct';
-import { nonNegativeNumberOrZero, optionalDateInput } from '@/lib/validation/optionalFields';
+import {
+  chipStringArray,
+  nonNegativeNumberOrZero,
+  optionalDateInput,
+  optionalStr,
+} from '@/lib/validation/optionalFields';
 
 // ─── Zod Schemas ─────────────────────────────────────────────────────────────
 
 const productSchema = z.object({
-  id: z.string().optional(),
-  brand: z.string().optional(),
-  model: z.string().optional(),
-  serial_number: z.string().optional(),
-  condition: z.string().optional(),
-  description: z.string().optional(),
-  remarks: z.string().optional(),
-  has_warranty: z.boolean().optional(),
-  warranty_description: z.string().optional(),
-  warranty_expiry_date: z.string().optional(),
-  accessories: z.array(z.string()).optional(),
-  other_parts: z.array(z.string()).optional(),
+  id: optionalStr,
+  brand: optionalStr,
+  model: optionalStr,
+  serial_number: optionalStr,
+  condition: optionalStr,
+  description: optionalStr,
+  remarks: optionalStr,
+  has_warranty: z.coerce.boolean().default(false),
+  warranty_description: optionalStr,
+  warranty_expiry_date: optionalStr,
+  accessories: chipStringArray,
+  other_parts: chipStringArray,
 });
 
 const editJobSchema = z.object({
@@ -78,11 +84,11 @@ const editJobSchema = z.object({
   priority: z.enum(['immediate', 'high', 'medium', 'low']),
   service_branch_id: z.string().min(1, 'Service branch is required'),
   delivery_branch_id: z.string().min(1, 'Delivery branch is required'),
-  assigned_incharge_id: z.string().optional(),
-  assigned_technician_id: z.string().optional(),
-  description: z.string().optional(),
-  technician_notes: z.string().optional(),
-  cam_clinic_advisory_notes: z.string().optional(),
+  assigned_incharge_id: optionalStr,
+  assigned_technician_id: optionalStr,
+  description: optionalStr,
+  technician_notes: optionalStr,
+  cam_clinic_advisory_notes: optionalStr,
   inspection_fee: nonNegativeNumberOrZero,
   service_charges: nonNegativeNumberOrZero,
   advance_paid: nonNegativeNumberOrZero,
@@ -100,7 +106,7 @@ interface AddPartRowProps {
   jobId: string;
 }
 
-function AddPartRow({ jobId }: AddPartRowProps) {
+const AddPartRow = memo(function AddPartRow({ jobId }: AddPartRowProps) {
   const [name, setName] = useState('');
   const [qty, setQty] = useState(1);
   const [price, setPrice] = useState(0);
@@ -160,7 +166,7 @@ function AddPartRow({ jobId }: AddPartRowProps) {
       </td>
     </tr>
   );
-}
+});
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
@@ -203,10 +209,9 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
     formState: { errors, isSubmitting },
   } = useForm<EditJobFormData>({
     resolver: zodResolver(editJobSchema) as Resolver<EditJobFormData>,
-    shouldUnregister: true,
     defaultValues: {
       gst_enabled: false,
-      products: [{ has_warranty: false }],
+      products: [{ has_warranty: false, accessories: [], other_parts: [] }],
     },
   });
 
@@ -245,8 +250,12 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
           has_warranty: p.has_warranty,
           warranty_description: p.warranty_description || '',
           warranty_expiry_date: p.warranty_expiry_date || '',
-          accessories: (p.accessories || []).map((a) => a.name),
-          other_parts: (p.other_parts || []).map((o) => o.name),
+          accessories: (p.accessories || [])
+            .map((a) => a.name)
+            .filter((n): n is string => typeof n === 'string' && n.trim().length > 0),
+          other_parts: (p.other_parts || [])
+            .map((o) => o.name)
+            .filter((n): n is string => typeof n === 'string' && n.trim().length > 0),
         })),
       });
     }
@@ -340,7 +349,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
           .filter((pid): pid is string => Boolean(pid))
       );
 
-      const toNull = (value?: string) => {
+      const toNull = (value?: string | null) => {
         const trimmed = value?.trim();
         return trimmed ? trimmed : null;
       };
@@ -485,6 +494,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
               <CardTitle>Customer Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <input type="hidden" {...register('customer_id')} />
               {selectedCustomer && !showChangeCustomer ? (
                 <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                   <div className="flex items-center gap-3">
@@ -712,7 +722,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => append({ has_warranty: false })}
+                onClick={() => append({ has_warranty: false, accessories: [], other_parts: [] })}
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Add Product
@@ -796,59 +806,12 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                       {...register(`products.${index}.remarks`)}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Controller
-                        control={control}
-                        name={`products.${index}.has_warranty`}
-                        defaultValue={false}
-                        render={({ field }) => (
-                          <>
-                            <input
-                              type="checkbox"
-                              id={`products.${index}.has_warranty`}
-                              className="rounded border-gray-300"
-                              checked={!!field.value}
-                              onChange={(e) => {
-                                const checked = e.target.checked;
-                                field.onChange(checked);
-                                if (!checked) {
-                                  setValue(`products.${index}.warranty_description`, '', {
-                                    shouldDirty: true,
-                                    shouldValidate: true,
-                                  });
-                                  setValue(`products.${index}.warranty_expiry_date`, '', {
-                                    shouldDirty: true,
-                                    shouldValidate: true,
-                                  });
-                                }
-                              }}
-                            />
-                            <label
-                              htmlFor={`products.${index}.has_warranty`}
-                              className="text-sm font-medium text-gray-700"
-                            >
-                              Has Warranty
-                            </label>
-                          </>
-                        )}
-                      />
-                    </div>
-                    {/* eslint-disable-next-line react-hooks/incompatible-library -- RHF watch for conditional warranty fields */}
-                    {watch(`products.${index}.has_warranty`) && (
-                      <div className="grid md:grid-cols-2 gap-4 pl-5">
-                        <Input
-                          label="Warranty Description"
-                          {...register(`products.${index}.warranty_description`)}
-                        />
-                        <Input
-                          type="date"
-                          label="Warranty Expiry Date"
-                          {...register(`products.${index}.warranty_expiry_date`)}
-                        />
-                      </div>
-                    )}
-                  </div>
+                  <ProductWarrantyFields
+                    control={control}
+                    index={index}
+                    register={register}
+                    setValue={setValue}
+                  />
                 </div>
               ))}
               {errors.products && (

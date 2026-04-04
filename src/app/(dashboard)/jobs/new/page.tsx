@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { ChipInput } from '@/components/ui/ChipInput';
+import { ProductWarrantyFields } from '@/components/jobs/ProductWarrantyFields';
 import { useCreateJob } from '@/hooks/useJobs';
 import { useSearchCustomers, useCreateCustomer } from '@/hooks/useCustomers';
 import { useBranches } from '@/hooks/useBranches';
@@ -19,30 +20,35 @@ import { useTechnicians, useServiceIncharges } from '@/hooks/useTechnicians';
 import { JOB_PRIORITY_LABELS, PRODUCT_CONDITION_LABELS, ProductCondition } from '@/types/enums';
 import { Customer } from '@/types/customer';
 import { toast } from 'sonner';
-import { optionalDateInput, optionalNonNegativeNumber } from '@/lib/validation/optionalFields';
+import {
+  chipStringArray,
+  optionalDateInput,
+  optionalNonNegativeNumber,
+  optionalStr,
+} from '@/lib/validation/optionalFields';
 
 const productSchema = z.object({
-  brand: z.string().optional(),
-  model: z.string().optional(),
-  serial_number: z.string().optional(),
-  condition: z.string().optional(),
-  description: z.string().optional(),
-  remarks: z.string().optional(),
-  has_warranty: z.boolean().optional(),
-  warranty_description: z.string().optional(),
-  warranty_expiry_date: z.string().optional(),
-  accessories: z.array(z.string()).optional(),
-  other_parts: z.array(z.string()).optional(),
+  brand: optionalStr,
+  model: optionalStr,
+  serial_number: optionalStr,
+  condition: optionalStr,
+  description: optionalStr,
+  remarks: optionalStr,
+  has_warranty: z.coerce.boolean().default(false),
+  warranty_description: optionalStr,
+  warranty_expiry_date: optionalStr,
+  accessories: chipStringArray,
+  other_parts: chipStringArray,
 });
 
 const jobSchema = z.object({
   customer_id: z.string().min(1, 'Customer is required'),
   service_branch_id: z.string().min(1, 'Service branch is required'),
   delivery_branch_id: z.string().min(1, 'Delivery branch is required'),
-  assigned_incharge_id: z.string().optional(),
-  assigned_technician_id: z.string().optional(),
+  assigned_incharge_id: optionalStr,
+  assigned_technician_id: optionalStr,
   priority: z.enum(['immediate', 'high', 'medium', 'low']),
-  description: z.string().optional(),
+  description: optionalStr,
   inspection_fee: optionalNonNegativeNumber,
   advance_paid: optionalNonNegativeNumber,
   advance_paid_date: optionalDateInput,
@@ -71,14 +77,12 @@ export default function NewJobPage() {
     handleSubmit,
     control,
     setValue,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<JobFormData>({
     resolver: zodResolver(jobSchema) as Resolver<JobFormData>,
-    shouldUnregister: true,
     defaultValues: {
       priority: 'medium',
-      products: [{ has_warranty: false }],
+      products: [{ has_warranty: false, accessories: [], other_parts: [] }],
     },
   });
 
@@ -354,7 +358,7 @@ export default function NewJobPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => append({ has_warranty: false })}
+                onClick={() => append({ has_warranty: false, accessories: [], other_parts: [] })}
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Add Product
@@ -444,59 +448,12 @@ export default function NewJobPage() {
                       {...register(`products.${index}.remarks`)}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Controller
-                        control={control}
-                        name={`products.${index}.has_warranty`}
-                        defaultValue={false}
-                        render={({ field }) => (
-                          <>
-                            <input
-                              type="checkbox"
-                              id={`products.${index}.has_warranty`}
-                              className="rounded border-gray-300"
-                              checked={!!field.value}
-                              onChange={(e) => {
-                                const checked = e.target.checked;
-                                field.onChange(checked);
-                                if (!checked) {
-                                  setValue(`products.${index}.warranty_description`, '', {
-                                    shouldDirty: true,
-                                    shouldValidate: true,
-                                  });
-                                  setValue(`products.${index}.warranty_expiry_date`, '', {
-                                    shouldDirty: true,
-                                    shouldValidate: true,
-                                  });
-                                }
-                              }}
-                            />
-                            <label
-                              htmlFor={`products.${index}.has_warranty`}
-                              className="text-sm font-medium text-gray-700"
-                            >
-                              Has Warranty
-                            </label>
-                          </>
-                        )}
-                      />
-                    </div>
-                    {/* eslint-disable-next-line react-hooks/incompatible-library -- RHF watch for conditional warranty fields */}
-                    {watch(`products.${index}.has_warranty`) && (
-                      <div className="grid md:grid-cols-2 gap-4 pl-5">
-                        <Input
-                          label="Warranty Description"
-                          {...register(`products.${index}.warranty_description`)}
-                        />
-                        <Input
-                          type="date"
-                          label="Warranty Expiry Date"
-                          {...register(`products.${index}.warranty_expiry_date`)}
-                        />
-                      </div>
-                    )}
-                  </div>
+                  <ProductWarrantyFields
+                    control={control}
+                    index={index}
+                    register={register}
+                    setValue={setValue}
+                  />
                 </div>
               ))}
               {errors.products && (

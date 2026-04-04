@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, KeyboardEvent, useRef } from 'react';
+import { memo, useState, KeyboardEvent, useRef } from 'react';
 import { X } from 'lucide-react';
 
 interface ChipInputProps {
@@ -13,7 +13,7 @@ interface ChipInputProps {
   className?: string;
 }
 
-export function ChipInput({
+function ChipInputInner({
   label,
   value,
   onChange,
@@ -109,3 +109,5 @@ export function ChipInput({
     </div>
   );
 }
+
+export const ChipInput = memo(ChipInputInner);
