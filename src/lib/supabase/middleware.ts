@@ -56,12 +56,20 @@ export async function updateSession(request: NextRequest) {
   if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
+    url.searchParams.set('reason', 'session_expired');
     return NextResponse.redirect(url);
   }
 
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
+    return NextResponse.redirect(url);
+  }
+
+  // User management moved to /technicians (Team)
+  if (user && request.nextUrl.pathname.startsWith('/settings')) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/technicians';
     return NextResponse.redirect(url);
   }
 

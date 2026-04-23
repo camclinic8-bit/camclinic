@@ -11,11 +11,11 @@ import { useAuthStore } from '@/stores/authStore';
 export function useAuth() {
   const router = useRouter();
   const { user, isLoading, isAuthenticated, setLoading, logout } = useAuthStore();
-  const supabase = createClient();
 
   const signIn = async (email: string, password: string) => {
     setLoading(true);
     try {
+      const supabase = createClient();
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       // Reset loading explicitly — SIGNED_IN event in AuthInitializer also resets
@@ -29,6 +29,7 @@ export function useAuth() {
   };
 
   const signOut = async () => {
+    const supabase = createClient();
     await supabase.auth.signOut();
     logout();
     router.push('/login');
