@@ -51,49 +51,8 @@ export async function GET() {
     }
 
     const profiles = (rows || []) as Profile[];
-    const needEmail = new Set(
-      profiles.filter((p) => !p.email?.trim()).map((p) => p.id)
-    );
-    if (needEmail.size === 0) {
-      return NextResponse.json(profiles);
-    }
 
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    if (!url || !serviceKey) {
-      return NextResponse.json(profiles);
-    }
-
-    const admin = createClient(url, serviceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-
-    const emailById = new Map<string, string>();
-    let page = 1;
-    const perPage = 200;
-
-    while (needEmail.size > 0 && page <= 100) {
-      const { data, error } = await admin.auth.admin.listUsers({
-        page,
-        perPage,
-      });
-      if (error || !data?.users?.length) break;
-      for (const u of data.users) {
-        if (needEmail.has(u.id) && u.email) {
-          emailById.set(u.id, u.email);
-          needEmail.delete(u.id);
-        }
-      }
-      if (data.users.length < perPage) break;
-      page += 1;
-    }
-
-    const merged: Profile[] = profiles.map((p) => ({
-      ...p,
-      email: p.email?.trim() ? p.email : emailById.get(p.id) ?? p.email ?? null,
-    }));
-
-    return NextResponse.json(merged);
+    return NextResponse.json(profiles);
   } catch (e) {
     console.error('GET /api/team:', e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

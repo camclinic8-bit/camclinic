@@ -134,6 +134,34 @@ function AuthInitializer() {
   return null;
 }
 
+function RealtimeInitializer({ queryClient }: { queryClient: QueryClient }) {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const supabase = createClient();
+
+    const channel = supabase
+      .channel('jobs-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => {
+        void queryClient.invalidateQueries({ queryKey: ['jobs'] });
+        void queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_status_history' }, () => {
+        void queryClient.invalidateQueries({ queryKey: ['jobs'] });
+        void queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+      })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [isAuthenticated, queryClient]);
+
+  return null;
+}
+
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
     () =>
@@ -153,6 +181,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthInitializer />
+      <RealtimeInitializer queryClient={queryClient} />
       {children}
       <Toaster position="top-right" richColors />
     </QueryClientProvider>

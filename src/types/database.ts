@@ -395,5 +395,14 @@ export interface Database {
       job_priority: JobPriority;
       product_condition: ProductCondition;
     };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
   };
 }

@@ -4,14 +4,7 @@ import { Customer, CustomerWithJobCount } from '@/types/customer';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TypedSupabaseClient = SupabaseClient<any>;
 
-/** Trim and require non-empty phone (DB column is NOT NULL). */
-function normalizeRequiredPhone(phone: string): string {
-  const t = phone.trim();
-  if (!t) {
-    throw new Error('Phone number is required');
-  }
-  return t;
-}
+
 
 /** Sanitize search input: strip commas (break PostgREST .or) and stray % in ilike patterns. */
 function sanitizeSearchTerm(raw: string): string {
@@ -94,11 +87,7 @@ export async function createCustomer(
   },
   shopId: string
 ): Promise<Customer> {
-  const phone = normalizeRequiredPhone(input.phone);
-  const name = input.name.trim();
-  if (!name) {
-    throw new Error('Customer name is required');
-  }
+  const { name, phone } = input;
   const { data, error } = await supabase
     .from('customers')
     .insert({
@@ -127,15 +116,7 @@ export async function updateCustomer(
   }
 ): Promise<Customer> {
   const payload = { ...input };
-  if (payload.phone !== undefined) {
-    payload.phone = normalizeRequiredPhone(payload.phone);
-  }
-  if (payload.name !== undefined) {
-    payload.name = payload.name.trim();
-    if (!payload.name) {
-      throw new Error('Customer name is required');
-    }
-  }
+
   const { data, error } = await supabase
     .from('customers')
     .update(payload)
