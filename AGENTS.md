@@ -56,3 +56,25 @@ Next.js 16.2 / React 19.2 / TS5 strict / Tailwind v4 / Supabase SSR / TanStack Q
 
 ## Scripts
 `npm run dev` / `npm run build` / `npm start` / `npm run lint` / `npm run seed:demo`
+
+---
+
+## Project Notes
+
+### Security: CVE-2026-45321 (TanStack Supply-Chain Attack)
+**Status**: ✅ **Not affected** — no action required.
+
+This project uses `@tanstack/react-query@5.95.2` (Query family), which was **not affected** by the May 11, 2026 supply-chain attack on the router/start monorepo. See `README.md` Security section for full details.
+
+### Critical Fixes (2026-05-16)
+See `PROJECT_JOURNEY.md` for the full session log. Key fixes:
+
+1. **GST Calculation Mismatch** (`src/app/(dashboard)/jobs/[id]/edit/page.tsx`)
+   - Frontend was calculating GST on the full subtotal; DB trigger only taxes `service_charges`.
+   - Fixed frontend formula to match DB: `gst = service_charges × 0.18`.
+
+2. **Missing Error Handling** (`src/lib/db/jobs.ts`)
+   - `createJob`, `updateJob`, `updateJobStatus` now properly check and throw on:
+     - Failed current job fetches (`fetchError`)
+     - Failed `job_status_history` inserts (`historyError`)
+   - Previously these failures were silent, meaning audit trails could disappear without error.
