@@ -333,9 +333,10 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
   const watchedAdvance = watch('advance_paid') || 0;
   const watchedGst = watch('gst_enabled');
   const sparePartsTotal = spareParts.reduce((sum, p) => sum + p.total_price, 0);
-  const subtotal = watchedInspection + watchedService + sparePartsTotal;
-  const gstAmount = watchedGst ? subtotal * 0.18 : 0;
-  const grandTotal = subtotal + gstAmount;
+  const totalCharges = watchedInspection + watchedService + sparePartsTotal;
+  // Match DB trigger: gst_amount = service_charges * 0.18 (GST applies to service only)
+  const gstAmount = watchedGst ? watchedService * 0.18 : 0;
+  const grandTotal = totalCharges + gstAmount;
   const balance = grandTotal - watchedAdvance;
 
   // ─── Submit ─────────────────────────────────────────────────────────────────

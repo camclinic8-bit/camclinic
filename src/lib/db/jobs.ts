@@ -263,7 +263,7 @@ export async function createJob(
   }
 
   // Create initial status history
-  await supabase
+  const { error: historyError } = await supabase
     .from('job_status_history')
     .insert({
       job_id: job.id,
@@ -272,6 +272,8 @@ export async function createJob(
       changed_by: createdBy,
       notes: 'Job created',
     });
+
+  if (historyError) throw historyError;
 
   return job as Job;
 }
@@ -283,11 +285,13 @@ export async function updateJob(
   userId: string
 ): Promise<Job> {
   // Get current job to check status change
-  const { data: currentJob } = await supabase
+  const { data: currentJob, error: fetchError } = await supabase
     .from('jobs')
     .select('status')
     .eq('id', id)
     .single();
+
+  if (fetchError) throw fetchError;
 
   const { data, error } = await supabase
     .from('jobs')
@@ -303,7 +307,7 @@ export async function updateJob(
 
   // Log status change if status was updated
   if (input.status && currentJob && input.status !== currentJob.status) {
-    await supabase
+    const { error: historyError } = await supabase
       .from('job_status_history')
       .insert({
         job_id: id,
@@ -311,6 +315,7 @@ export async function updateJob(
         to_status: input.status,
         changed_by: userId,
       });
+    if (historyError) throw historyError;
   }
 
   return data as Job;
@@ -323,14 +328,16 @@ export async function updateJobStatus(
   userId: string,
   notes?: string
 ): Promise<Job> {
-  const { data: currentJob } = await supabase
+  const { data: currentJob, error: fetchError } = await supabase
     .from('jobs')
     .select('status')
     .eq('id', id)
     .single();
 
+  if (fetchError) throw fetchError;
+
   const updateData: Partial<Job> = { status };
-  
+
   // Set service_date when status becomes completed
   if (status === 'completed') {
     updateData.service_date = new Date().toISOString();
@@ -347,7 +354,7 @@ export async function updateJobStatus(
 
   // Log status change
   if (currentJob) {
-    await supabase
+    const { error: historyError } = await supabase
       .from('job_status_history')
       .insert({
         job_id: id,
@@ -356,6 +363,7 @@ export async function updateJobStatus(
         changed_by: userId,
         notes,
       });
+    if (historyError) throw historyError;
   }
 
   return data as Job;
