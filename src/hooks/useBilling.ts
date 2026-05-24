@@ -1,13 +1,14 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { createClient } from '@/lib/supabase/client';
 import {
   getSpareParts,
   addSparePart,
   updateSparePart,
   deleteSparePart,
   updateJobCharges,
-} from '@/features/billing/api';
+} from '@/lib/db/billing';
 import { queryKeys } from '@/lib/queryKeys';
 import type { SparePart, SparePartInput } from '@/types/billing';
 import type { JobWithRelations } from '@/types/job';
@@ -21,9 +22,10 @@ function syncJobSparePartsInCache(queryClient: QueryClient, jobId: string, spare
 }
 
 export function useSpareParts(jobId: string) {
+  const supabase = createClient();
   return useQuery({
     queryKey: queryKeys.billing.spareParts(jobId),
-    queryFn: () => getSpareParts(jobId),
+    queryFn: () => getSpareParts(supabase, jobId),
     staleTime: 30 * 1000,
     enabled: !!jobId,
   });
@@ -31,9 +33,10 @@ export function useSpareParts(jobId: string) {
 
 export function useAddSparePart(jobId: string) {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
-    mutationFn: (input: SparePartInput) => addSparePart(jobId, input),
+    mutationFn: (input: SparePartInput) => addSparePart(supabase, jobId, input),
     onSuccess: (newPart) => {
       queryClient.setQueryData<SparePart[]>(queryKeys.billing.spareParts(jobId), (old) => {
         const next = old ? [...old, newPart] : [newPart];
@@ -52,10 +55,11 @@ export function useAddSparePart(jobId: string) {
 
 export function useUpdateSparePart(jobId: string) {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: Partial<SparePartInput> }) =>
-      updateSparePart(id, input),
+      updateSparePart(supabase, id, input),
     onSuccess: (updated) => {
       queryClient.setQueryData<SparePart[]>(queryKeys.billing.spareParts(jobId), (old) =>
         old ? old.map((p) => (p.id === updated.id ? updated : p)) : [updated]
@@ -72,9 +76,10 @@ export function useUpdateSparePart(jobId: string) {
 
 export function useDeleteSparePart(jobId: string) {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
-    mutationFn: (id: string) => deleteSparePart(id),
+    mutationFn: (id: string) => deleteSparePart(supabase, id, jobId),
     onSuccess: (_, deletedId) => {
       queryClient.setQueryData<SparePart[]>(queryKeys.billing.spareParts(jobId), (old) =>
         old ? old.filter((p) => p.id !== deletedId) : []
@@ -92,10 +97,11 @@ export function useDeleteSparePart(jobId: string) {
 
 export function useUpdateJobCharges(jobId: string) {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
-    mutationFn: (charges: Parameters<typeof updateJobCharges>[1]) =>
-      updateJobCharges(jobId, charges),
+    mutationFn: (charges: Parameters<typeof updateJobCharges>[2]) =>
+      updateJobCharges(supabase, jobId, charges),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.jobs.detail(jobId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.jobs.all });

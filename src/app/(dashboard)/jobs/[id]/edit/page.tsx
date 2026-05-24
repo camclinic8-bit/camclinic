@@ -24,6 +24,7 @@ import {
   useDeleteSparePart,
   useSpareParts,
 } from '@/hooks/useBilling';
+import { createClient } from '@/lib/supabase/client';
 import {
   JOB_PRIORITY_LABELS,
   JOB_STATUS_LABELS,
@@ -33,9 +34,7 @@ import {
 import { formatINR } from '@/lib/utils/currency';
 import { Customer } from '@/types/customer';
 import { toast } from 'sonner';
-import {
-  syncJobProducts,
-} from '@/features/products/api';
+import { syncJobProducts } from '@/lib/db/products';
 import { normalizeJobProductWarrantyForDb } from '@/lib/utils/normalizeJobProduct';
 import {
   chipStringArray,
@@ -363,7 +362,8 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
         };
       });
 
-      await syncJobProducts(id, productsPayload);
+      const supabase = createClient();
+      await syncJobProducts(supabase, id, productsPayload);
 
       await updateJob.mutateAsync({
         id,

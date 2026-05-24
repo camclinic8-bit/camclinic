@@ -1,13 +1,14 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { createClient } from '@/lib/supabase/client';
 import {
   getCustomers,
   searchCustomers,
   createCustomer, 
   updateCustomer,
   getCustomerWithJobCount 
-} from '@/features/customers/api';
+} from '@/lib/db/customers';
 import { queryKeys } from '@/lib/queryKeys';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
@@ -15,10 +16,11 @@ import { isAppError } from '@/lib/errors';
 
 export function useCustomers(page = 1, pageSize = 20, search?: string) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const supabase = createClient();
 
   return useQuery({
     queryKey: queryKeys.customers.list(page, pageSize, search),
-    queryFn: () => getCustomers(search, page, pageSize),
+    queryFn: () => getCustomers(supabase, search, page, pageSize),
     staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
     enabled: isAuthenticated,
@@ -26,18 +28,20 @@ export function useCustomers(page = 1, pageSize = 20, search?: string) {
 }
 
 export function useCustomer(id: string) {
+  const supabase = createClient();
   return useQuery({
     queryKey: queryKeys.customers.detail(id),
-    queryFn: () => getCustomerWithJobCount(id),
+    queryFn: () => getCustomerWithJobCount(supabase, id),
     staleTime: 60 * 1000,
     enabled: !!id,
   });
 }
 
 export function useSearchCustomers(query: string) {
+  const supabase = createClient();
   return useQuery({
     queryKey: queryKeys.customers.search(query),
-    queryFn: () => searchCustomers(query),
+    queryFn: () => searchCustomers(supabase, query),
     enabled: query.length >= 2,
   });
 }
@@ -45,13 +49,14 @@ export function useSearchCustomers(query: string) {
 export function useCreateCustomer() {
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
+  const supabase = createClient();
 
   return useMutation({
     mutationFn: (input: { name: string; phone: string; email?: string | null; address?: string | null }) => {
       if (!user?.shop_id) {
         throw new Error('User not authenticated');
       }
-      return createCustomer(input, user.shop_id);
+      return createCustomer(supabase, input, user.shop_id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.all });
@@ -66,10 +71,11 @@ export function useCreateCustomer() {
 
 export function useUpdateCustomer() {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: { name?: string; phone?: string; email?: string | null; address?: string | null } }) => {
-      return updateCustomer(id, input);
+      return updateCustomer(supabase, id, input);
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.all });

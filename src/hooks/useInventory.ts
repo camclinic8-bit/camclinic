@@ -1,23 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  getAccessories,
-  getAccessoryById,
-  createAccessory,
-  updateAccessory,
-  deleteAccessory,
-  getBrands,
-  getBrandById,
-  createBrand,
-  updateBrand,
-  deleteBrand,
-  getModels,
-  getModelById,
-  createModel,
-  updateModel,
-  deleteModel,
-} from '@/features/inventory/api';
+import { createClient } from '@/lib/supabase/client';
 import { queryKeys } from '@/lib/queryKeys';
 import type { AccessoryInput, BrandInput, ModelInput } from '@/types/inventory';
 import { toast } from 'sonner';
@@ -26,26 +10,36 @@ import { isAppError } from '@/lib/errors';
 // ─── Accessories ─────────────────────────────────────────────────────────────
 
 export function useAccessories() {
+  const supabase = createClient();
   return useQuery({
     queryKey: queryKeys.inventory.accessories(),
-    queryFn: () => getAccessories(),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('accessories')
+        .select('*')
+        .order('name', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
     staleTime: 5 * 60 * 1000,
-  });
-}
-
-export function useAccessory(id: string) {
-  return useQuery({
-    queryKey: queryKeys.inventory.accessory(id),
-    queryFn: () => getAccessoryById(id),
-    enabled: !!id,
   });
 }
 
 export function useCreateAccessory() {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
-    mutationFn: (input: AccessoryInput) => createAccessory(input),
+    mutationFn: async (input: AccessoryInput) => {
+      // @ts-ignore - Supabase types not yet generated for new inventory tables (run migration first)
+      const { data, error } = await supabase
+        .from('accessories')
+        .insert(input as any)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.accessories() });
       toast.success('Accessory created successfully');
@@ -59,13 +53,22 @@ export function useCreateAccessory() {
 
 export function useUpdateAccessory() {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: Partial<AccessoryInput> }) =>
-      updateAccessory(id, input),
+    mutationFn: async ({ id, input }: { id: string; input: Partial<AccessoryInput> }) => {
+      // @ts-ignore - Supabase types not yet generated for new inventory tables (run migration first)
+      const { data, error } = await supabase
+        .from('accessories')
+        .update(input as any)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.accessories() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.accessory(variables.id) });
       toast.success('Accessory updated successfully');
     },
     onError: (error: Error) => {
@@ -77,9 +80,16 @@ export function useUpdateAccessory() {
 
 export function useDeleteAccessory() {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
-    mutationFn: (id: string) => deleteAccessory(id),
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('accessories')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.accessories() });
       toast.success('Accessory deleted');
@@ -94,26 +104,36 @@ export function useDeleteAccessory() {
 // ─── Brands ─────────────────────────────────────────────────────────────────
 
 export function useBrands() {
+  const supabase = createClient();
   return useQuery({
     queryKey: queryKeys.inventory.brands(),
-    queryFn: () => getBrands(),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('brands')
+        .select('*')
+        .order('name', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
     staleTime: 5 * 60 * 1000,
-  });
-}
-
-export function useBrand(id: string) {
-  return useQuery({
-    queryKey: queryKeys.inventory.brand(id),
-    queryFn: () => getBrandById(id),
-    enabled: !!id,
   });
 }
 
 export function useCreateBrand() {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
-    mutationFn: (input: BrandInput) => createBrand(input),
+    mutationFn: async (input: BrandInput) => {
+      // @ts-ignore - Supabase types not yet generated for new inventory tables (run migration first)
+      const { data, error } = await supabase
+        .from('brands')
+        .insert(input as any)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.brands() });
       toast.success('Brand created successfully');
@@ -127,13 +147,22 @@ export function useCreateBrand() {
 
 export function useUpdateBrand() {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: Partial<BrandInput> }) =>
-      updateBrand(id, input),
+    mutationFn: async ({ id, input }: { id: string; input: Partial<BrandInput> }) => {
+      // @ts-ignore - Supabase types not yet generated for new inventory tables (run migration first)
+      const { data, error } = await supabase
+        .from('brands')
+        .update(input as any)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.brands() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.brand(variables.id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.models() });
       toast.success('Brand updated successfully');
     },
@@ -146,9 +175,16 @@ export function useUpdateBrand() {
 
 export function useDeleteBrand() {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
-    mutationFn: (id: string) => deleteBrand(id),
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('brands')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.brands() });
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.models() });
@@ -164,26 +200,42 @@ export function useDeleteBrand() {
 // ─── Models ─────────────────────────────────────────────────────────────────
 
 export function useModels(brandId?: string) {
+  const supabase = createClient();
   return useQuery({
     queryKey: queryKeys.inventory.models(brandId),
-    queryFn: () => getModels(brandId),
-    staleTime: 5 * 60 * 1000,
-  });
-}
+    queryFn: async () => {
+      let query = supabase
+        .from('models')
+        .select('*, brand:brands(id, name)')
+        .order('name', { ascending: true });
 
-export function useModel(id: string) {
-  return useQuery({
-    queryKey: queryKeys.inventory.model(id),
-    queryFn: () => getModelById(id),
-    enabled: !!id,
+      if (brandId) {
+        query = query.eq('brand_id', brandId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
   });
 }
 
 export function useCreateModel() {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
-    mutationFn: (input: ModelInput) => createModel(input),
+    mutationFn: async (input: ModelInput) => {
+      // @ts-ignore - Supabase types not yet generated for new inventory tables (run migration first)
+      const { data, error } = await supabase
+        .from('models')
+        .insert(input as any)
+        .select('*, brand:brands(id, name)')
+        .single();
+      if (error) throw error;
+      return data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.models() });
       toast.success('Model created successfully');
@@ -197,10 +249,20 @@ export function useCreateModel() {
 
 export function useUpdateModel() {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: Partial<ModelInput> }) =>
-      updateModel(id, input),
+    mutationFn: async ({ id, input }: { id: string; input: Partial<ModelInput> }) => {
+      // @ts-ignore - Supabase types not yet generated for new inventory tables (run migration first)
+      const { data, error } = await supabase
+        .from('models')
+        .update(input as any)
+        .eq('id', id)
+        .select('*, brand:brands(id, name)')
+        .single();
+      if (error) throw error;
+      return data;
+    },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.models() });
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.model(variables.id) });
@@ -215,9 +277,16 @@ export function useUpdateModel() {
 
 export function useDeleteModel() {
   const queryClient = useQueryClient();
+  const supabase = createClient();
 
   return useMutation({
-    mutationFn: (id: string) => deleteModel(id),
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('models')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.inventory.models() });
       toast.success('Model deleted');
