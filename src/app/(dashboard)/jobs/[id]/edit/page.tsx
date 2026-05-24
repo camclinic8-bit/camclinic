@@ -14,6 +14,7 @@ import { Select } from '@/components/ui/Select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { ChipInput } from '@/components/ui/ChipInput';
 import { ProductWarrantyFields } from '@/components/jobs/ProductWarrantyFields';
+import { AccessoryCheckboxList } from '@/components/inventory/AccessoryCheckboxList';
 import { useJob, useUpdateJob } from '@/hooks/useJobs';
 import { useBranches } from '@/hooks/useBranches';
 import { useTechnicians, useServiceIncharges } from '@/hooks/useTechnicians';
@@ -32,16 +33,9 @@ import {
 import { formatINR } from '@/lib/utils/currency';
 import { Customer } from '@/types/customer';
 import { toast } from 'sonner';
-import { createClient } from '@/lib/supabase/client';
 import {
-  addAccessoriesBulk,
-  addOtherPartsBulk,
-  clearAccessoriesByProductId,
-  clearOtherPartsByProductId,
-  createProduct,
-  deleteProduct,
-  updateProduct,
-} from '@/lib/db/products';
+  syncJobProducts,
+} from '@/features/products/api';
 import { normalizeJobProductWarrantyForDb } from '@/lib/utils/normalizeJobProduct';
 import {
   chipStringArray,
@@ -175,7 +169,6 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
   const router = useRouter();
 
   const { data: job, isPending } = useJob(id);
-  const supabase = createClient();
   const { data: spareParts = [] } = useSpareParts(id);
   const updateJob = useUpdateJob();
   const queryClient = useQueryClient();
@@ -346,30 +339,16 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
       if (!job) return;
 
       // Sync product rows and their chip collections (accessories / other_parts).
-      // Existing code updated only top-level job fields, so product edits were lost.
-      const existingProducts = job.products || [];
-      const existingProductIds = new Set(existingProducts.map((p) => p.id));
-      const incomingProductIds = new Set(
-        data.products
-          .map((p) => p.id)
-          .filter((pid): pid is string => Boolean(pid))
-      );
-
+      // Use transaction-safe RPC function to handle all product operations atomically.
       const toNull = (value?: string | null) => {
         const trimmed = value?.trim();
         return trimmed ? trimmed : null;
       };
 
-      // Remove products deleted in form
-      await Promise.all(
-        [...existingProductIds]
-          .filter((existingId) => !incomingProductIds.has(existingId))
-          .map((existingId) => deleteProduct(supabase, existingId))
-      );
-
-      await Promise.all(data.products.map(async (product) => {
+      const productsPayload = data.products.map((product) => {
         const w = normalizeJobProductWarrantyForDb(product);
-        const productPayload = {
+        return {
+          id: product.id || undefined,
           brand: toNull(product.brand),
           model: toNull(product.model),
           serial_number: toNull(product.serial_number),
@@ -379,37 +358,12 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
           has_warranty: w.has_warranty,
           warranty_description: w.warranty_description,
           warranty_expiry_date: w.warranty_expiry_date,
+          accessories: (product.accessories || []).map((name) => name.trim()).filter(Boolean),
+          other_parts: (product.other_parts || []).map((name) => name.trim()).filter(Boolean),
         };
+      });
 
-        let productId = product.id;
-
-        if (productId) {
-          await updateProduct(supabase, productId, productPayload);
-        } else {
-          const inserted = await createProduct(supabase, { ...productPayload, job_id: id });
-          productId = inserted.id;
-        }
-
-        if (!productId) return;
-
-        const cleanedAccessories = (product.accessories || [])
-          .map((name) => name.trim())
-          .filter(Boolean);
-        const cleanedParts = (product.other_parts || [])
-          .map((name) => name.trim())
-          .filter(Boolean);
-
-        // Clear old chips first (parallel), then insert in bulk (parallel).
-        await Promise.all([
-          clearAccessoriesByProductId(supabase, productId),
-          clearOtherPartsByProductId(supabase, productId),
-        ]);
-
-        await Promise.all([
-          addAccessoriesBulk(supabase, productId, cleanedAccessories),
-          addOtherPartsBulk(supabase, productId, cleanedParts),
-        ]);
-      }));
+      await syncJobProducts(id, productsPayload);
 
       await updateJob.mutateAsync({
         id,
@@ -777,11 +731,9 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                       name={`products.${index}.accessories`}
                       defaultValue={[]}
                       render={({ field: f }) => (
-                        <ChipInput
-                          label="Accessories"
+                        <AccessoryCheckboxList
                           value={f.value || []}
                           onChange={f.onChange}
-                          placeholder="Add accessory, press Enter"
                         />
                       )}
                     />

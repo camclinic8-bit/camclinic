@@ -14,6 +14,7 @@ import {
   X,
   ChevronsLeft,
   ChevronsRight,
+  Package,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
@@ -23,6 +24,7 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Jobs', href: '/jobs', icon: Briefcase },
   { name: 'Customers', href: '/customers', icon: Users },
+  { name: 'Inventory', href: '/inventory', icon: Package },
   { name: 'Team', href: '/technicians', icon: Users2, roles: ['super_admin', 'service_manager', 'service_incharge'] },
   { name: 'Branches', href: '/branches', icon: Building2, roles: ['super_admin', 'service_manager', 'service_incharge'] },
   { name: 'Reports', href: '/reports', icon: BarChart3 },

@@ -1,19 +1,19 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createClient } from '@/lib/supabase/client';
 import {
   updateProduct,
-  addAccessory,
-  removeAccessory,
-  addOtherPart,
-  removeOtherPart,
-} from '@/lib/db/products';
+  addAccessoriesBulk,
+  addOtherPartsBulk,
+  clearAccessoriesByProductId,
+  clearOtherPartsByProductId,
+} from '@/features/products/api';
+import { queryKeys } from '@/lib/queryKeys';
 import { toast } from 'sonner';
+import { isAppError } from '@/lib/errors';
 
 export function useUpdateProduct(jobId: string) {
   const queryClient = useQueryClient();
-  const supabase = createClient();
 
   return useMutation({
     mutationFn: ({
@@ -21,75 +21,76 @@ export function useUpdateProduct(jobId: string) {
       input,
     }: {
       id: string;
-      input: Parameters<typeof updateProduct>[2];
-    }) => updateProduct(supabase, id, input),
+      input: Parameters<typeof updateProduct>[1];
+    }) => updateProduct(id, input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.detail(jobId) });
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to update product');
+      const message = isAppError(error) ? error.message : 'Failed to update product';
+      toast.error(message);
     },
   });
 }
 
 export function useAddAccessory(jobId: string) {
   const queryClient = useQueryClient();
-  const supabase = createClient();
 
   return useMutation({
     mutationFn: ({ productId, name }: { productId: string; name: string }) =>
-      addAccessory(supabase, productId, name),
+      addAccessoriesBulk(productId, [name]),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.detail(jobId) });
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to add accessory');
+      const message = isAppError(error) ? error.message : 'Failed to add accessory';
+      toast.error(message);
     },
   });
 }
 
 export function useRemoveAccessory(jobId: string) {
   const queryClient = useQueryClient();
-  const supabase = createClient();
 
   return useMutation({
-    mutationFn: (id: string) => removeAccessory(supabase, id),
+    mutationFn: (id: string) => clearAccessoriesByProductId(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.detail(jobId) });
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to remove accessory');
+      const message = isAppError(error) ? error.message : 'Failed to remove accessory';
+      toast.error(message);
     },
   });
 }
 
 export function useAddOtherPart(jobId: string) {
   const queryClient = useQueryClient();
-  const supabase = createClient();
 
   return useMutation({
     mutationFn: ({ productId, name }: { productId: string; name: string }) =>
-      addOtherPart(supabase, productId, name),
+      addOtherPartsBulk(productId, [name]),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.detail(jobId) });
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to add part');
+      const message = isAppError(error) ? error.message : 'Failed to add part';
+      toast.error(message);
     },
   });
 }
 
 export function useRemoveOtherPart(jobId: string) {
   const queryClient = useQueryClient();
-  const supabase = createClient();
 
   return useMutation({
-    mutationFn: (id: string) => removeOtherPart(supabase, id),
+    mutationFn: (id: string) => clearOtherPartsByProductId(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.detail(jobId) });
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to remove part');
+      const message = isAppError(error) ? error.message : 'Failed to remove part';
+      toast.error(message);
     },
   });
 }

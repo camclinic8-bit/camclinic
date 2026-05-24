@@ -13,6 +13,7 @@ import { Select } from '@/components/ui/Select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { ChipInput } from '@/components/ui/ChipInput';
 import { ProductWarrantyFields } from '@/components/jobs/ProductWarrantyFields';
+import { AccessoryCheckboxList } from '@/components/inventory/AccessoryCheckboxList';
 import { useCreateJob } from '@/hooks/useJobs';
 import { useSearchCustomers, useCreateCustomer } from '@/hooks/useCustomers';
 import { useBranches } from '@/hooks/useBranches';
@@ -409,11 +410,9 @@ export default function NewJobPage() {
                       name={`products.${index}.accessories`}
                       defaultValue={[]}
                       render={({ field }) => (
-                        <ChipInput
-                          label="Accessories"
+                        <AccessoryCheckboxList
                           value={field.value || []}
                           onChange={field.onChange}
-                          placeholder="Add accessory, press Enter"
                         />
                       )}
                     />

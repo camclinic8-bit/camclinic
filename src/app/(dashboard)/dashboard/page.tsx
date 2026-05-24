@@ -20,8 +20,8 @@ import { JOB_STATUS_LABELS, JobStatus } from '@/types/enums';
 export default function DashboardPage() {
   const { selectedBranchId } = useBranchStore();
   const { data: stats, isLoading: statsLoading } = useDashboardStats(selectedBranchId || undefined);
-  const { data: jobsDueToday, isLoading: dueTodayLoading } = useJobsDueToday(selectedBranchId || undefined);
-  const { data: jobCounts, isLoading: countsLoading } = useJobCounts(selectedBranchId || undefined);
+  const { data: jobsDueToday, isLoading: dueTodayLoading } = useJobsDueToday();
+  const { data: jobCounts, isLoading: countsLoading } = useJobCounts();
 
   const statCards = [
     {
@@ -77,11 +77,15 @@ export default function DashboardPage() {
                   <div className={`p-2 rounded-lg ${stat.color}`}>
                     <stat.icon className="h-5 w-5 text-white" />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <p className="text-xs text-gray-500">{stat.title}</p>
-                    <p className={`font-semibold text-gray-900 ${stat.isAmount ? 'text-sm' : 'text-lg'}`}>
-                      {statsLoading ? '-' : stat.value}
-                    </p>
+                    {statsLoading ? (
+                      <div className="h-6 bg-gray-200 rounded animate-pulse mt-1 w-16" />
+                    ) : (
+                      <p className={`font-semibold text-gray-900 ${stat.isAmount ? 'text-sm' : 'text-lg'}`}>
+                        {stat.value}
+                      </p>
+                    )}
                   </div>
                 </div>
               </CardContent>

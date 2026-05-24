@@ -12,6 +12,7 @@ import { formatINR } from '@/lib/utils/currency';
 import { summarizeJobProductsLine } from '@/lib/utils/jobProducts';
 import { createClient } from '@/lib/supabase/client';
 import { getJobById } from '@/lib/db/jobs';
+import { queryKeys } from '@/lib/queryKeys';
 
 interface JobCardProps {
   job: JobWithRelations;
@@ -22,7 +23,7 @@ export function JobCard({ job }: JobCardProps) {
 
   const prefetchDetail = () => {
     void queryClient.prefetchQuery({
-      queryKey: ['job', job.id],
+      queryKey: queryKeys.jobs.detail(job.id),
       queryFn: () => getJobById(createClient(), job.id),
       staleTime: 5 * 60 * 1000,
     });

@@ -198,13 +198,76 @@ export default function JobsPage() {
         </div>
 
         {isLoading && !data ? (
-          <Card>
-            <CardContent className="p-0">
-              <div className="divide-y divide-gray-100">
-                {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                  <div key={i} className="h-14 bg-gray-50/80 animate-pulse" />
-                ))}
-              </div>
+          <Card className="border-gray-200/80 shadow-sm overflow-hidden">
+            <CardContent className="p-0 overflow-x-auto">
+              <Table className="min-w-[1040px]">
+                <TableHeader>
+                  <tr className="border-b border-gray-200 bg-gray-50/90">
+                    <TableHead className="pl-3 lg:pl-4 !text-left text-gray-600 min-w-[200px]">
+                      Job
+                    </TableHead>
+                    <TableHead className="min-w-[150px]">Customer</TableHead>
+                    <TableHead className="min-w-[180px] hidden md:table-cell">Products</TableHead>
+                    <TableHead className="whitespace-nowrap">Status</TableHead>
+                    <TableHead className="whitespace-nowrap hidden sm:table-cell">Priority</TableHead>
+                    <TableHead className="hidden lg:table-cell min-w-[108px]">Technician</TableHead>
+                    <TableHead className="hidden xl:table-cell">Branch</TableHead>
+                    <TableHead className="hidden md:table-cell whitespace-nowrap">Created</TableHead>
+                    <TableHead className="text-right hidden sm:table-cell">Total</TableHead>
+                    <TableHead className="pr-3 lg:pr-4 text-right whitespace-nowrap min-w-[7.5rem]">
+                      Balance
+                    </TableHead>
+                  </tr>
+                </TableHeader>
+                <TableBody>
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                    <tr key={i} className="border-0 border-b border-gray-100 last:border-0">
+                      <TableCell className="pl-3 lg:pl-4 align-top">
+                        <div className="flex items-start gap-2">
+                          <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse" />
+                          <div className="flex-1 space-y-2">
+                            <div className="h-4 bg-gray-200 rounded animate-pulse w-24" />
+                            <div className="h-3 bg-gray-200 rounded animate-pulse w-16 md:hidden" />
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <div className="space-y-2">
+                          <div className="h-4 bg-gray-200 rounded animate-pulse w-32" />
+                          <div className="h-3 bg-gray-200 rounded animate-pulse w-24" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="align-top hidden md:table-cell">
+                        <div className="h-4 bg-gray-200 rounded animate-pulse w-full" />
+                      </TableCell>
+                      <TableCell className="align-middle">
+                        <div className="h-7 w-20 bg-gray-200 rounded-full animate-pulse" />
+                      </TableCell>
+                      <TableCell className="align-middle hidden sm:table-cell">
+                        <div className="h-7 w-16 bg-gray-200 rounded-full animate-pulse" />
+                      </TableCell>
+                      <TableCell className="align-middle hidden lg:table-cell">
+                        <div className="h-4 bg-gray-200 rounded animate-pulse w-24" />
+                      </TableCell>
+                      <TableCell className="align-middle hidden xl:table-cell">
+                        <div className="h-4 bg-gray-200 rounded animate-pulse w-20" />
+                      </TableCell>
+                      <TableCell className="align-middle hidden md:table-cell">
+                        <div className="h-4 bg-gray-200 rounded animate-pulse w-20" />
+                      </TableCell>
+                      <TableCell className="align-middle text-right hidden sm:table-cell">
+                        <div className="h-4 bg-gray-200 rounded animate-pulse w-16 ml-auto" />
+                      </TableCell>
+                      <TableCell className="pr-3 lg:pr-4 text-right align-middle">
+                        <div className="flex items-center justify-end gap-1">
+                          <div className="h-4 bg-gray-200 rounded animate-pulse w-16" />
+                          <div className="h-7 w-7 bg-gray-200 rounded animate-pulse" />
+                        </div>
+                      </TableCell>
+                    </tr>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         ) : data?.data && data.data.length > 0 ? (

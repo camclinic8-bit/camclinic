@@ -24,26 +24,27 @@ export async function addSparePart(
   jobId: string,
   input: SparePartInput
 ): Promise<SparePart> {
+  // Use transaction-safe RPC function
   const { data, error } = await supabase
-    .from('spare_parts')
-    .insert({
-      job_id: jobId,
-      name: input.name,
-      quantity: input.quantity,
-      unit_price: input.unit_price,
-    })
-    .select()
-    .single();
+    .rpc('add_spare_part_with_job_update', {
+      p_job_id: jobId,
+      p_name: input.name,
+      p_quantity: input.quantity,
+      p_unit_price: input.unit_price,
+    });
 
   if (error) throw error;
 
-  // Trigger job totals recalculation by updating the job
-  await supabase
-    .from('jobs')
-    .update({ updated_at: new Date().toISOString() })
-    .eq('id', jobId);
+  // Fetch the complete spare part
+  const { data: sparePart, error: fetchError } = await supabase
+    .from('spare_parts')
+    .select('*')
+    .eq('id', (data as { id: string }).id)
+    .single();
 
-  return data as SparePart;
+  if (fetchError) throw fetchError;
+
+  return sparePart as SparePart;
 }
 
 export async function updateSparePart(
@@ -51,23 +52,27 @@ export async function updateSparePart(
   id: string,
   input: Partial<SparePartInput>
 ): Promise<SparePart> {
+  // Use transaction-safe RPC function
   const { data, error } = await supabase
-    .from('spare_parts')
-    .update(input)
-    .eq('id', id)
-    .select()
-    .single();
+    .rpc('update_spare_part_with_job_update', {
+      p_spare_part_id: id,
+      p_name: input.name,
+      p_quantity: input.quantity,
+      p_unit_price: input.unit_price,
+    });
 
   if (error) throw error;
 
-  // Get job_id to trigger recalculation
-  const sparePart = data as SparePart;
-  await supabase
-    .from('jobs')
-    .update({ updated_at: new Date().toISOString() })
-    .eq('id', sparePart.job_id);
+  // Fetch the complete spare part
+  const { data: sparePart, error: fetchError } = await supabase
+    .from('spare_parts')
+    .select('*')
+    .eq('id', id)
+    .single();
 
-  return sparePart;
+  if (fetchError) throw fetchError;
+
+  return sparePart as SparePart;
 }
 
 export async function deleteSparePart(
@@ -75,18 +80,13 @@ export async function deleteSparePart(
   id: string,
   jobId: string
 ): Promise<void> {
+  // Use transaction-safe RPC function
   const { error } = await supabase
-    .from('spare_parts')
-    .delete()
-    .eq('id', id);
+    .rpc('delete_spare_part_with_job_update', {
+      p_spare_part_id: id,
+    });
 
   if (error) throw error;
-
-  // Trigger job totals recalculation
-  await supabase
-    .from('jobs')
-    .update({ updated_at: new Date().toISOString() })
-    .eq('id', jobId);
 }
 
 export async function updateJobCharges(

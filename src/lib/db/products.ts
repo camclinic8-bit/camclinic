@@ -72,6 +72,34 @@ export async function updateProduct(
   return data as unknown as JobProduct;
 }
 
+// NEW: Transaction-safe function to sync all products for a job
+export async function syncJobProducts(
+  supabase: TypedSupabaseClient,
+  jobId: string,
+  products: Array<{
+    id?: string;
+    brand?: string | null;
+    model?: string | null;
+    serial_number?: string | null;
+    condition?: string | null;
+    description?: string | null;
+    remarks?: string | null;
+    has_warranty?: boolean;
+    warranty_description?: string | null;
+    warranty_expiry_date?: string | null;
+    accessories?: string[];
+    other_parts?: string[];
+  }>
+): Promise<void> {
+  const { error } = await supabase
+    .rpc('sync_job_products', {
+      p_job_id: jobId,
+      p_products: products,
+    });
+
+  if (error) throw error;
+}
+
 export async function createProduct(
   supabase: TypedSupabaseClient,
   input: {

@@ -179,101 +179,51 @@ export async function createJob(
   shopId: string,
   createdBy: string
 ): Promise<Job> {
-  // Get next job number
-  const { data: jobNumberData, error: jobNumberError } = await supabase
-    .rpc('get_next_job_number');
+  // Use transaction-safe RPC function
+  const productsJson = input.products.map(p => ({
+    brand: p.brand,
+    model: p.model,
+    serial_number: p.serial_number,
+    condition: p.condition,
+    description: p.description,
+    remarks: p.remarks,
+    has_warranty: p.has_warranty,
+    warranty_description: p.warranty_description,
+    warranty_expiry_date: p.warranty_expiry_date,
+    accessories: p.accessories || [],
+    other_parts: p.other_parts || [],
+  }));
 
-  if (jobNumberError) throw jobNumberError;
-
-  const jobNumber = jobNumberData as string;
-
-  // Create the job
-  const { data: job, error: jobError } = await supabase
-    .from('jobs')
-    .insert({
-      shop_id: shopId,
-      job_number: jobNumber,
-      customer_id: input.customer_id,
-      service_branch_id: input.service_branch_id,
-      delivery_branch_id: input.delivery_branch_id,
-      assigned_incharge_id: input.assigned_incharge_id,
-      assigned_technician_id: input.assigned_technician_id,
-      priority: input.priority,
-      description: input.description,
-      inspection_fee: input.inspection_fee ?? 0,
-      advance_paid: input.advance_paid ?? 0,
-      advance_paid_date:
-        input.advance_paid && input.advance_paid > 0
-          ? input.advance_paid_date?.trim() || null
-          : null,
-      estimate_delivery_date: input.estimate_delivery_date?.trim() || null,
-      created_by: createdBy,
-      status: 'new',
-    })
-    .select()
-    .single();
-
-  if (jobError) throw jobError;
-
-  // Create job products
-  for (const product of input.products) {
-    const w = normalizeJobProductWarrantyForDb(product);
-    const { data: jobProduct, error: productError } = await supabase
-      .from('job_products')
-      .insert({
-        job_id: job.id,
-        brand: product.brand,
-        model: product.model,
-        serial_number: product.serial_number,
-        condition: product.condition,
-        description: product.description,
-        remarks: product.remarks,
-        has_warranty: w.has_warranty,
-        warranty_description: w.warranty_description,
-        warranty_expiry_date: w.warranty_expiry_date,
-      })
-      .select()
-      .single();
-
-    if (productError) throw productError;
-
-    // Create accessories
-    if (product.accessories && product.accessories.length > 0) {
-      const accessories = product.accessories.map(name => ({
-        job_product_id: jobProduct.id,
-        name,
-      }));
-      const { error: accError } = await supabase
-        .from('product_accessories')
-        .insert(accessories);
-      if (accError) throw accError;
-    }
-
-    // Create other parts
-    if (product.other_parts && product.other_parts.length > 0) {
-      const otherParts = product.other_parts.map(name => ({
-        job_product_id: jobProduct.id,
-        name,
-      }));
-      const { error: partsError } = await supabase
-        .from('product_other_parts')
-        .insert(otherParts);
-      if (partsError) throw partsError;
-    }
-  }
-
-  // Create initial status history
-  const { error: historyError } = await supabase
-    .from('job_status_history')
-    .insert({
-      job_id: job.id,
-      from_status: null,
-      to_status: 'new',
-      changed_by: createdBy,
-      notes: 'Job created',
+  const { data, error } = await supabase
+    .rpc('create_job_with_products', {
+      p_shop_id: shopId,
+      p_customer_id: input.customer_id,
+      p_service_branch_id: input.service_branch_id,
+      p_delivery_branch_id: input.delivery_branch_id,
+      p_created_by: createdBy,
+      p_assigned_incharge_id: input.assigned_incharge_id || null,
+      p_assigned_technician_id: input.assigned_technician_id || null,
+      p_priority: input.priority,
+      p_description: input.description || null,
+      p_inspection_fee: input.inspection_fee ?? 0,
+      p_advance_paid: input.advance_paid ?? 0,
+      p_advance_paid_date: input.advance_paid && input.advance_paid > 0
+        ? input.advance_paid_date?.trim() || null
+        : null,
+      p_estimate_delivery_date: input.estimate_delivery_date?.trim() || null,
+      p_products: productsJson,
     });
 
-  if (historyError) throw historyError;
+  if (error) throw error;
+
+  // Fetch the complete job with relations
+  const { data: job, error: fetchError } = await supabase
+    .from('jobs')
+    .select('*')
+    .eq('id', (data as { id: string }).id)
+    .single();
+
+  if (fetchError) throw fetchError;
 
   return job as Job;
 }
@@ -284,41 +234,43 @@ export async function updateJob(
   input: JobUpdateInput,
   userId: string
 ): Promise<Job> {
-  // Get current job to check status change
-  const { data: currentJob, error: fetchError } = await supabase
+  // Use transaction-safe RPC function for basic job update
+  // Note: Products are handled separately in the edit page for now
+  // This could be consolidated in a future refactor
+  const { data, error } = await supabase
+    .rpc('update_job_with_products', {
+      p_job_id: id,
+      p_status: input.status || null,
+      p_priority: input.priority || null,
+      p_service_branch_id: input.service_branch_id || null,
+      p_delivery_branch_id: input.delivery_branch_id || null,
+      p_assigned_incharge_id: input.assigned_incharge_id || null,
+      p_assigned_technician_id: input.assigned_technician_id || null,
+      p_description: input.description || null,
+      p_technician_notes: input.technician_notes || null,
+      p_cam_clinic_advisory_notes: input.cam_clinic_advisory_notes || null,
+      p_inspection_fee: input.inspection_fee || null,
+      p_service_charges: input.service_charges || null,
+      p_advance_paid: input.advance_paid || null,
+      p_advance_paid_date: input.advance_paid_date || null,
+      p_gst_enabled: input.gst_enabled || null,
+      p_estimate_delivery_date: input.estimate_delivery_date || null,
+      p_user_id: userId,
+      p_products: null, // Products handled separately in edit page
+    });
+
+  if (error) throw error;
+
+  // Fetch the complete job with relations
+  const { data: job, error: fetchError } = await supabase
     .from('jobs')
-    .select('status')
+    .select('*')
     .eq('id', id)
     .single();
 
   if (fetchError) throw fetchError;
 
-  const { data, error } = await supabase
-    .from('jobs')
-    .update({
-      ...input,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  // Log status change if status was updated
-  if (input.status && currentJob && input.status !== currentJob.status) {
-    const { error: historyError } = await supabase
-      .from('job_status_history')
-      .insert({
-        job_id: id,
-        from_status: currentJob.status,
-        to_status: input.status,
-        changed_by: userId,
-      });
-    if (historyError) throw historyError;
-  }
-
-  return data as Job;
+  return job as Job;
 }
 
 export async function updateJobStatus(
@@ -328,45 +280,27 @@ export async function updateJobStatus(
   userId: string,
   notes?: string
 ): Promise<Job> {
-  const { data: currentJob, error: fetchError } = await supabase
+  // Use transaction-safe RPC function
+  const { data, error } = await supabase
+    .rpc('update_job_status_with_history', {
+      p_job_id: id,
+      p_status: status,
+      p_user_id: userId,
+      p_notes: notes || null,
+    });
+
+  if (error) throw error;
+
+  // Fetch the complete job with relations
+  const { data: job, error: fetchError } = await supabase
     .from('jobs')
-    .select('status')
+    .select('*')
     .eq('id', id)
     .single();
 
   if (fetchError) throw fetchError;
 
-  const updateData: Partial<Job> = { status };
-
-  // Set service_date when status becomes completed
-  if (status === 'completed') {
-    updateData.service_date = new Date().toISOString();
-  }
-
-  const { data, error } = await supabase
-    .from('jobs')
-    .update(updateData)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  // Log status change
-  if (currentJob) {
-    const { error: historyError } = await supabase
-      .from('job_status_history')
-      .insert({
-        job_id: id,
-        from_status: currentJob.status,
-        to_status: status,
-        changed_by: userId,
-        notes,
-      });
-    if (historyError) throw historyError;
-  }
-
-  return data as Job;
+  return job as Job;
 }
 
 export async function deleteJob(
