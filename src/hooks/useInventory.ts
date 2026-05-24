@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { queryKeys } from '@/lib/queryKeys';
-import type { AccessoryInput, BrandInput, ModelInput } from '@/types/inventory';
+import type { Accessory, Brand, Model, AccessoryInput, BrandInput, ModelInput } from '@/types/inventory';
 import { toast } from 'sonner';
 import { isAppError } from '@/lib/errors';
 
@@ -14,12 +14,13 @@ export function useAccessories() {
   return useQuery({
     queryKey: queryKeys.inventory.accessories(),
     queryFn: async () => {
+      // @ts-ignore - Supabase types not yet generated for new inventory tables (run migration first)
       const { data, error } = await supabase
         .from('accessories')
         .select('*')
         .order('name', { ascending: true });
       if (error) throw error;
-      return data || [];
+      return (data || []) as Accessory[];
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -60,6 +61,7 @@ export function useUpdateAccessory() {
       // @ts-ignore - Supabase types not yet generated for new inventory tables (run migration first)
       const { data, error } = await supabase
         .from('accessories')
+        // @ts-ignore
         .update(input as any)
         .eq('id', id)
         .select()
@@ -108,12 +110,13 @@ export function useBrands() {
   return useQuery({
     queryKey: queryKeys.inventory.brands(),
     queryFn: async () => {
+      // @ts-ignore - Supabase types not yet generated for new inventory tables (run migration first)
       const { data, error } = await supabase
         .from('brands')
         .select('*')
         .order('name', { ascending: true });
       if (error) throw error;
-      return data || [];
+      return (data || []) as Brand[];
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -154,6 +157,7 @@ export function useUpdateBrand() {
       // @ts-ignore - Supabase types not yet generated for new inventory tables (run migration first)
       const { data, error } = await supabase
         .from('brands')
+        // @ts-ignore
         .update(input as any)
         .eq('id', id)
         .select()
@@ -204,6 +208,7 @@ export function useModels(brandId?: string) {
   return useQuery({
     queryKey: queryKeys.inventory.models(brandId),
     queryFn: async () => {
+      // @ts-ignore - Supabase types not yet generated for new inventory tables (run migration first)
       let query = supabase
         .from('models')
         .select('*, brand:brands(id, name)')
@@ -215,7 +220,7 @@ export function useModels(brandId?: string) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data || [];
+      return (data || []) as Model[];
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -256,6 +261,7 @@ export function useUpdateModel() {
       // @ts-ignore - Supabase types not yet generated for new inventory tables (run migration first)
       const { data, error } = await supabase
         .from('models')
+        // @ts-ignore
         .update(input as any)
         .eq('id', id)
         .select('*, brand:brands(id, name)')
