@@ -1,7 +1,10 @@
 -- Migration: Add terms_and_conditions table
 -- This allows admins to manage terms and conditions that appear in PDFs
 
-CREATE TABLE IF NOT EXISTS terms_and_conditions (
+-- Drop existing table if it exists (to handle schema changes)
+DROP TABLE IF EXISTS terms_and_conditions CASCADE;
+
+CREATE TABLE terms_and_conditions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   content TEXT NOT NULL,
