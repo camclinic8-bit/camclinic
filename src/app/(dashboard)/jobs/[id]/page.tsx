@@ -26,7 +26,7 @@ import { JobPriorityBadge } from '@/components/jobs/JobPriorityBadge';
 import { useJob, useUpdateJobStatus } from '@/hooks/useJobs';
 import { useUpdateJobCharges } from '@/hooks/useBilling';
 import { useAuth } from '@/hooks/useAuth';
-import { formatDate, formatDateTime, isExpired } from '@/lib/utils/dates';
+import { formatDate, formatDateTime, isExpired, getLocalToday } from '@/lib/utils/dates';
 import { formatINR } from '@/lib/utils/currency';
 import { JOB_STATUS_LABELS, PRODUCT_CONDITION_LABELS, JobStatus } from '@/types/enums';
 import { toast } from 'sonner';
@@ -66,7 +66,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     const newAdvance = roundMoney((job.advance_paid || 0) + amount);
     await updateCharges.mutateAsync({
       advance_paid: newAdvance,
-      advance_paid_date: new Date().toISOString().split('T')[0],
+      advance_paid_date: getLocalToday(),
     });
     setPaymentAmount('');
     setShowPaymentInput(false);

@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { normalizeJobProductWarrantyForDb } from '@/lib/utils/normalizeJobProduct';
+import { getLocalToday } from '@/lib/utils/dates';
 import { 
   Job, 
   JobWithRelations, 
@@ -388,7 +389,7 @@ export async function getJobsDueToday(
   supabase: TypedSupabaseClient,
   branchId?: string
 ): Promise<JobWithRelations[]> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalToday();
 
   let query = supabase
     .from('jobs')
