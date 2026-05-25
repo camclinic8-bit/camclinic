@@ -86,7 +86,6 @@ const editJobSchema = z.object({
   service_charges: nonNegativeNumberOrZero,
   advance_paid: nonNegativeNumberOrZero,
   advance_paid_date: optionalDateInput,
-  gst_enabled: z.boolean(),
   estimate_delivery_date: optionalDateInput,
   spare_parts_total_cost: nonNegativeNumberOrZero,
   products: z.array(productSchema).min(1, 'At least one product is required'),
@@ -203,7 +202,6 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
   } = useForm<EditJobFormData>({
     resolver: zodResolver(editJobSchema) as Resolver<EditJobFormData>,
     defaultValues: {
-      gst_enabled: false,
       products: [{ has_warranty: false, accessories: [], other_parts: [] }],
     },
   });
@@ -235,7 +233,6 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
         service_charges: job.service_charges,
         advance_paid: job.advance_paid,
         advance_paid_date: job.advance_paid_date || '',
-        gst_enabled: job.gst_enabled,
         estimate_delivery_date: job.estimate_delivery_date || '',
         spare_parts_total_cost: job.spare_parts_total_cost || 0,
         products: (job.products || []).map((p) => ({
@@ -325,12 +322,9 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
   const watchedInspection = watch('inspection_fee') || 0;
   const watchedService = watch('service_charges') || 0;
   const watchedAdvance = watch('advance_paid') || 0;
-  const watchedGst = watch('gst_enabled');
   const sparePartsTotal = spareParts.reduce((sum, p) => sum + p.total_price, 0);
   const totalCharges = watchedInspection + watchedService + sparePartsTotal;
-  // Match DB trigger: gst_amount = service_charges * 0.18 (GST applies to service only)
-  const gstAmount = watchedGst ? watchedService * 0.18 : 0;
-  const grandTotal = totalCharges + gstAmount;
+  const grandTotal = totalCharges;
   const balance = grandTotal - watchedAdvance;
 
   // ─── Submit ─────────────────────────────────────────────────────────────────
@@ -386,7 +380,6 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
             data.advance_paid && data.advance_paid > 0
               ? data.advance_paid_date?.trim() || null
               : null,
-          gst_enabled: data.gst_enabled,
           estimate_delivery_date: data.estimate_delivery_date?.trim() || null,
           spare_parts_total_cost: data.spare_parts_total_cost ?? 0,
         },
@@ -853,20 +846,6 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                     <span>{formatINR(sparePartsTotal)}</span>
                   </div>
                 )}
-                <div className="flex justify-between">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="gst_enabled"
-                      className="rounded border-gray-300"
-                      {...register('gst_enabled')}
-                    />
-                    <label htmlFor="gst_enabled" className="text-gray-600 cursor-pointer">
-                      GST (18%)
-                    </label>
-                  </div>
-                  <span>{formatINR(gstAmount)}</span>
-                </div>
                 <div className="flex justify-between font-semibold border-t pt-2">
                   <span>Grand Total</span>
                   <span>{formatINR(grandTotal)}</span>
