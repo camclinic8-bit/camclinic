@@ -19,41 +19,23 @@ CREATE INDEX IF NOT EXISTS idx_terms_and_conditions_is_active ON terms_and_condi
 -- Row Level Security
 ALTER TABLE terms_and_conditions ENABLE ROW LEVEL SECURITY;
 
--- Only super_admins and service_managers can view terms and conditions
-CREATE POLICY "Admins can view terms and conditions"
+-- All authenticated users can view terms and conditions
+CREATE POLICY "Authenticated users can view terms and conditions"
   ON terms_and_conditions
   FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE profiles.id = auth.uid()
-      AND profiles.role IN ('super_admin', 'service_manager')
-    )
-  );
+  USING (auth.uid() IS NOT NULL);
 
--- Only super_admins and service_managers can insert terms and conditions
-CREATE POLICY "Admins can insert terms and conditions"
+-- All authenticated users can insert terms and conditions
+CREATE POLICY "Authenticated users can insert terms and conditions"
   ON terms_and_conditions
   FOR INSERT
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE profiles.id = auth.uid()
-      AND profiles.role IN ('super_admin', 'service_manager')
-    )
-  );
+  WITH CHECK (auth.uid() IS NOT NULL);
 
--- Only super_admins and service_managers can update terms and conditions
-CREATE POLICY "Admins can update terms and conditions"
+-- All authenticated users can update terms and conditions
+CREATE POLICY "Authenticated users can update terms and conditions"
   ON terms_and_conditions
   FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE profiles.id = auth.uid()
-      AND profiles.role IN ('super_admin', 'service_manager')
-    )
-  );
+  USING (auth.uid() IS NOT NULL);
 
 -- Only super_admins can delete terms and conditions
 CREATE POLICY "Super admins can delete terms and conditions"
