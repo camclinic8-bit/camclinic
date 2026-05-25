@@ -754,7 +754,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                     defaultValue={[]}
                     render={({ field: f }) => (
                       <ChipInput
-                        label="Other Parts"
+                        label="Other"
                         value={f.value || []}
                         onChange={f.onChange}
                         placeholder="Add part, press Enter (e.g. Original box)"

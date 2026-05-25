@@ -305,7 +305,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                         </div>
 
                         <div>
-                          <p className="text-xs text-gray-500 mb-1">Other Parts</p>
+                          <p className="text-xs text-gray-500 mb-1">Other</p>
                           {product.other_parts && product.other_parts.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
                               {product.other_parts.map((o, idx) => (
