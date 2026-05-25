@@ -210,6 +210,8 @@ export async function createJob(
     has_warranty: p.has_warranty,
     warranty_description: p.warranty_description,
     warranty_expiry_date: p.warranty_expiry_date,
+    repeat_job_number: p.repeat_job_number,
+    other_job_number: p.other_job_number,
     accessories: p.accessories || [],
     other_parts: p.other_parts || [],
   }));

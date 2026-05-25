@@ -363,6 +363,8 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
           has_warranty: w.has_warranty,
           warranty_description: w.warranty_description,
           warranty_expiry_date: w.warranty_expiry_date,
+          repeat_job_number: toNull(product.repeat_job_number),
+          other_job_number: toNull(product.other_job_number),
           accessories: (product.accessories || []).map((name) => name.trim()).filter(Boolean),
           other_parts: (product.other_parts || []).map((name) => name.trim()).filter(Boolean),
         };
