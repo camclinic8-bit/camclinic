@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { Modal } from '@/components/ui/Modal';
+import { BranchSelector } from '@/components/layout/BranchSelector';
 import { toast } from 'sonner';
 import { Edit, FileText, Save } from 'lucide-react';
 
@@ -122,12 +123,15 @@ export default function TermsAndConditionsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Terms and Conditions</h1>
           <p className="text-gray-500">Edit terms and conditions for receipts and invoices</p>
         </div>
-        {activeTerms && (
-          <Button onClick={() => handleOpenModal(activeTerms)}>
-            <Edit className="h-4 w-4 mr-2" />
-            Edit
-          </Button>
-        )}
+        <div className="flex items-center gap-4">
+          <BranchSelector />
+          {activeTerms && (
+            <Button onClick={() => handleOpenModal(activeTerms)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Edit
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Active Terms */}
