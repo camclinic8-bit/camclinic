@@ -38,6 +38,8 @@ const productSchema = z.object({
   has_warranty: z.coerce.boolean().default(false),
   warranty_description: optionalStr,
   warranty_expiry_date: optionalStr,
+  repeat_job_number: optionalStr,
+  other_job_number: optionalStr,
   accessories: chipStringArray,
   other_parts: chipStringArray,
 });
@@ -421,6 +423,18 @@ export default function NewJobPage() {
                     <Input
                       label="Serial Number"
                       {...register(`products.${index}.serial_number`)}
+                    />
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <Input
+                      label="Repeat Job Number"
+                      placeholder="e.g. CC-20250101-0001"
+                      {...register(`products.${index}.repeat_job_number`)}
+                    />
+                    <Input
+                      label="Other Job Number"
+                      placeholder="e.g. CC-20250101-0002"
+                      {...register(`products.${index}.other_job_number`)}
                     />
                   </div>
                   <div className="grid md:grid-cols-2 gap-4">

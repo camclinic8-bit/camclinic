@@ -11,7 +11,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmp
 import { JobStatusBadge } from '@/components/jobs/JobStatusBadge';
 import { useJobsReport } from '@/hooks/useReports';
 import { useBranchStore } from '@/stores/branchStore';
-import { formatDate } from '@/lib/utils/dates';
+import { formatDate, getLocalToday } from '@/lib/utils/dates';
 import { formatINR } from '@/lib/utils/currency';
 import { JOB_STATUS_LABELS, JobStatus } from '@/types/enums';
 
@@ -60,7 +60,7 @@ export default function ReportsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `jobs-report-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `jobs-report-${getLocalToday()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };

@@ -4,6 +4,31 @@ import { Branch } from './branch';
 import { Profile } from './user';
 import { SparePart } from './billing';
 
+export interface PaymentTransaction {
+  id: string;
+  job_id: string;
+  amount: number;
+  payment_date: string;
+  payment_method: string;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  created_by_user?: {
+    id: string;
+    full_name: string;
+  };
+}
+
+export interface TermsAndConditions {
+  id: string;
+  title: string;
+  content: string;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface JobProduct {
   id: string;
   job_id: string;
@@ -16,6 +41,8 @@ export interface JobProduct {
   has_warranty: boolean;
   warranty_description: string | null;
   warranty_expiry_date: string | null;
+  repeat_job_number: string | null;
+  other_job_number: string | null;
   created_at: string;
   updated_at: string;
   accessories?: ProductAccessory[];
@@ -77,6 +104,7 @@ export interface JobWithRelations extends Job {
   products?: JobProduct[];
   spare_parts?: SparePart[];
   status_history?: JobStatusHistory[];
+  payment_transactions?: PaymentTransaction[];
 }
 
 export interface JobStatusHistory {
@@ -124,6 +152,8 @@ export interface JobProductInput {
   has_warranty?: boolean;
   warranty_description?: string | null;
   warranty_expiry_date?: string | null;
+  repeat_job_number?: string | null;
+  other_job_number?: string | null;
   accessories?: string[];
   other_parts?: string[];
 }

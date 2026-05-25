@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { use, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -26,10 +26,14 @@ import { JobPriorityBadge } from '@/components/jobs/JobPriorityBadge';
 import { useJob, useUpdateJobStatus } from '@/hooks/useJobs';
 import { useUpdateJobCharges } from '@/hooks/useBilling';
 import { useAuth } from '@/hooks/useAuth';
-import { formatDate, formatDateTime, isExpired } from '@/lib/utils/dates';
+import { formatDate, formatDateTime, isExpired, getLocalToday } from '@/lib/utils/dates';
 import { formatINR } from '@/lib/utils/currency';
+import { getActiveTermsAndConditions } from '@/lib/db/terms';
+import { useBranchStore } from '@/stores/branchStore';
 import { JOB_STATUS_LABELS, PRODUCT_CONDITION_LABELS, JobStatus } from '@/types/enums';
 import { toast } from 'sonner';
+import { createClient } from '@/lib/supabase/client';
+import { addPaymentTransaction } from '@/lib/db/jobs';
 
 function roundMoney(n: number): number {
   return Math.round(n * 100) / 100;
@@ -41,10 +45,26 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const { data: job, isPending } = useJob(id);
   const updateStatus = useUpdateJobStatus();
   const updateCharges = useUpdateJobCharges(id);
-  const { canSetAnyStatus } = useAuth();
+  const { canSetAnyStatus, user } = useAuth();
+  const { selectedBranchId } = useBranchStore();
 
   const [showPaymentInput, setShowPaymentInput] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [terms, setTerms] = useState<any>(null);
+
+  // Fetch active terms and conditions (global)
+  useEffect(() => {
+    const fetchTerms = async () => {
+      const supabase = createClient();
+      try {
+        const activeTerms = await getActiveTermsAndConditions(supabase);
+        setTerms(activeTerms);
+      } catch (error) {
+        console.error('Failed to fetch terms:', error);
+      }
+    };
+    fetchTerms();
+  }, []);
 
   const handleStatusChange = async (newStatus: JobStatus) => {
     if (!job) return;
@@ -52,7 +72,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   };
 
   const handleRecordPayment = async () => {
-    if (!job) return;
+    if (!job || !user) return;
     const maxPay = roundMoney(job.balance_amount);
     const amount = roundMoney(parseFloat(paymentAmount));
     if (isNaN(amount) || amount <= 0) {
@@ -64,12 +84,23 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       return;
     }
     const newAdvance = roundMoney((job.advance_paid || 0) + amount);
+    
+    // Record payment transaction
+    const supabase = createClient();
+    try {
+      await addPaymentTransaction(supabase, job.id, amount, user.id, 'cash');
+    } catch (error) {
+      toast.error('Failed to record payment transaction');
+      return;
+    }
+    
     await updateCharges.mutateAsync({
       advance_paid: newAdvance,
-      advance_paid_date: new Date().toISOString().split('T')[0],
+      advance_paid_date: getLocalToday(),
     });
     setPaymentAmount('');
     setShowPaymentInput(false);
+    toast.success(`Payment of ${formatINR(amount)} recorded successfully`);
   };
 
   const handlePaymentAmountChange = (raw: string, balanceDue: number) => {
@@ -108,21 +139,21 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const handleDownloadReceipt = async () => {
     if (!job) return;
     const { generateReceipt, downloadPDF } = await import('@/lib/utils/pdf');
-    const doc = generateReceipt(job);
+    const doc = generateReceipt(job, terms);
     downloadPDF(doc, `receipt-${job.job_number}.pdf`);
   };
 
   const handleDownloadQuote = async () => {
     if (!job) return;
     const { generateQuote, downloadPDF } = await import('@/lib/utils/pdf');
-    const doc = generateQuote(job);
+    const doc = generateQuote(job, terms);
     downloadPDF(doc, `quote-${job.job_number}.pdf`);
   };
 
   const handleDownloadInvoice = async () => {
     if (!job) return;
     const { generateInvoice, downloadPDF } = await import('@/lib/utils/pdf');
-    const doc = generateInvoice(job);
+    const doc = generateInvoice(job, terms);
     downloadPDF(doc, `invoice-${job.job_number}.pdf`);
   };
 
@@ -259,6 +290,17 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                           </div>
                         </div>
 
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="rounded-md bg-gray-50 p-3">
+                            <p className="text-xs text-gray-500">Repeat Job #</p>
+                            <p className="font-medium text-gray-900">{product.repeat_job_number || '-'}</p>
+                          </div>
+                          <div className="rounded-md bg-gray-50 p-3">
+                            <p className="text-xs text-gray-500">Other Job #</p>
+                            <p className="font-medium text-gray-900">{product.other_job_number || '-'}</p>
+                          </div>
+                        </div>
+
                         {product.description && (
                           <div>
                             <p className="text-xs text-gray-500 mb-1">Product Description</p>
@@ -292,7 +334,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                         </div>
 
                         <div>
-                          <p className="text-xs text-gray-500 mb-1">Other Parts</p>
+                          <p className="text-xs text-gray-500 mb-1">Other</p>
                           {product.other_parts && product.other_parts.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
                               {product.other_parts.map((o, idx) => (
@@ -503,6 +545,29 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                       </span>
                     </div>
 
+                    {/* Payment History */}
+                    {job.payment_transactions && job.payment_transactions.length > 0 && (
+                      <div className="border-t pt-2 mt-2">
+                        <p className="text-gray-600 font-medium mb-2">Payment History</p>
+                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                          {job.payment_transactions.map((transaction) => (
+                            <div key={transaction.id} className="flex justify-between items-center text-xs bg-gray-50 p-2 rounded">
+                              <div>
+                                <span className="font-medium">{formatINR(transaction.amount)}</span>
+                                <span className="text-gray-500 ml-2">
+                                  {formatDateTime(transaction.payment_date)}
+                                </span>
+                                {transaction.created_by_user && (
+                                  <span className="text-gray-400 ml-2">by {transaction.created_by_user.full_name}</span>
+                                )}
+                              </div>
+                              <span className="text-gray-500 capitalize">{transaction.payment_method}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Record Payment */}
                     {job.balance_amount > 0 && (
                       <div className="pt-2">
@@ -608,6 +673,15 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                       <div>
                         <p className="text-gray-500">Est. Delivery</p>
                         <p className="font-medium">{formatDate(job.estimate_delivery_date)}</p>
+                      </div>
+                    </div>
+                  )}
+                  {!job.estimate_delivery_date && (
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-gray-400" />
+                      <div>
+                        <p className="text-gray-500">Est. Delivery</p>
+                        <p className="font-medium text-gray-400">Not set</p>
                       </div>
                     </div>
                   )}

@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
+import { useBranchStore } from '@/stores/branchStore';
 
 /**
  * Lightweight hook — just reads from the Zustand store and exposes actions.
@@ -11,6 +12,7 @@ import { useAuthStore } from '@/stores/authStore';
 export function useAuth() {
   const router = useRouter();
   const { user, isLoading, isAuthenticated, setLoading, logout } = useAuthStore();
+  const resetBranch = useBranchStore((state) => state.resetBranch);
 
   const signIn = async (email: string, password: string) => {
     setLoading(true);
@@ -32,6 +34,7 @@ export function useAuth() {
     const supabase = createClient();
     await supabase.auth.signOut();
     logout();
+    resetBranch();
     router.push('/login');
   };
 

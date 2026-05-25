@@ -1,12 +1,14 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { normalizeJobProductWarrantyForDb } from '@/lib/utils/normalizeJobProduct';
+import { getLocalToday } from '@/lib/utils/dates';
 import { 
   Job, 
   JobWithRelations, 
   JobCreateInput, 
   JobUpdateInput, 
   JobFilters,
-  JobStatusHistory 
+  JobStatusHistory,
+  PaymentTransaction
 } from '@/types/job';
 import { JobStatus } from '@/types/enums';
 
@@ -92,8 +94,13 @@ export async function getJobs(
       const orParts = [`job_number.ilike.%${term}%`, `description.ilike.%${term}%`];
       const ids = matchingCustomers?.map((c) => c.id) ?? [];
       if (ids.length > 0) {
-        const maxIn = 200;
-        orParts.push(`customer_id.in.(${ids.slice(0, maxIn).join(',')})`);
+        // Use subquery approach to avoid IN clause limit
+        // Split into batches to avoid URL length limits
+        const batchSize = 100;
+        for (let i = 0; i < ids.length; i += batchSize) {
+          const batch = ids.slice(i, i + batchSize);
+          orParts.push(`customer_id.in.(${batch.join(',')})`);
+        }
       }
       query = query.or(orParts.join(','));
     }
@@ -140,6 +147,8 @@ export async function getJobById(
         has_warranty,
         warranty_description,
         warranty_expiry_date,
+        repeat_job_number,
+        other_job_number,
         accessories:product_accessories(id, job_product_id, name),
         other_parts:product_other_parts(id, job_product_id, name)
       ),
@@ -153,6 +162,17 @@ export async function getJobById(
         notes,
         created_at,
         changed_by_user:profiles!job_status_history_changed_by_fkey(id, full_name)
+      ),
+      payment_transactions:payment_transactions(
+        id,
+        job_id,
+        amount,
+        payment_date,
+        payment_method,
+        notes,
+        created_by,
+        created_at,
+        created_by_user:profiles!payment_transactions_created_by_fkey(id, full_name)
       )
     `
     )
@@ -190,6 +210,8 @@ export async function createJob(
     has_warranty: p.has_warranty,
     warranty_description: p.warranty_description,
     warranty_expiry_date: p.warranty_expiry_date,
+    repeat_job_number: p.repeat_job_number,
+    other_job_number: p.other_job_number,
     accessories: p.accessories || [],
     other_parts: p.other_parts || [],
   }));
@@ -273,6 +295,49 @@ export async function updateJob(
   if (fetchError) throw fetchError;
 
   return job as Job;
+}
+
+export async function addPaymentTransaction(
+  supabase: TypedSupabaseClient,
+  jobId: string,
+  amount: number,
+  userId: string,
+  paymentMethod: string = 'cash',
+  notes?: string
+): Promise<PaymentTransaction> {
+  const { data, error } = await supabase
+    .from('payment_transactions')
+    .insert({
+      job_id: jobId,
+      amount,
+      payment_method: paymentMethod,
+      notes: notes || null,
+      created_by: userId,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return data as PaymentTransaction;
+}
+
+export async function getPaymentTransactions(
+  supabase: TypedSupabaseClient,
+  jobId: string
+): Promise<PaymentTransaction[]> {
+  const { data, error } = await supabase
+    .from('payment_transactions')
+    .select(`
+      *,
+      created_by_user:profiles!payment_transactions_created_by_fkey(id, full_name)
+    `)
+    .eq('job_id', jobId)
+    .order('payment_date', { ascending: false });
+
+  if (error) throw error;
+
+  return (data as unknown as PaymentTransaction[]) || [];
 }
 
 export async function updateJobStatus(
@@ -383,7 +448,7 @@ export async function getJobsDueToday(
   supabase: TypedSupabaseClient,
   branchId?: string
 ): Promise<JobWithRelations[]> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalToday();
 
   let query = supabase
     .from('jobs')

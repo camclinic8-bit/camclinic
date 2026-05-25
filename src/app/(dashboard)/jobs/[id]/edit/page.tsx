@@ -56,6 +56,8 @@ const productSchema = z.object({
   has_warranty: z.coerce.boolean().default(false),
   warranty_description: optionalStr,
   warranty_expiry_date: optionalStr,
+  repeat_job_number: optionalStr,
+  other_job_number: optionalStr,
   accessories: chipStringArray,
   other_parts: chipStringArray,
 });
@@ -249,6 +251,8 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
           has_warranty: p.has_warranty,
           warranty_description: p.warranty_description || '',
           warranty_expiry_date: p.warranty_expiry_date || '',
+          repeat_job_number: p.repeat_job_number || '',
+          other_job_number: p.other_job_number || '',
           accessories: (p.accessories || [])
             .map((a) => a.name)
             .filter((n): n is string => typeof n === 'string' && n.trim().length > 0),
@@ -328,8 +332,8 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
   const watchedGst = watch('gst_enabled');
   const sparePartsTotal = spareParts.reduce((sum, p) => sum + p.total_price, 0);
   const totalCharges = watchedInspection + watchedService + sparePartsTotal;
-  // Match DB trigger: gst_amount = service_charges * 0.18 (GST applies to service only)
-  const gstAmount = watchedGst ? watchedService * 0.18 : 0;
+  // GST applies to full amount (inspection + service + parts)
+  const gstAmount = watchedGst ? totalCharges * 0.18 : 0;
   const grandTotal = totalCharges + gstAmount;
   const balance = grandTotal - watchedAdvance;
 
@@ -359,6 +363,8 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
           has_warranty: w.has_warranty,
           warranty_description: w.warranty_description,
           warranty_expiry_date: w.warranty_expiry_date,
+          repeat_job_number: toNull(product.repeat_job_number),
+          other_job_number: toNull(product.other_job_number),
           accessories: (product.accessories || []).map((name) => name.trim()).filter(Boolean),
           other_parts: (product.other_parts || []).map((name) => name.trim()).filter(Boolean),
         };
@@ -730,6 +736,18 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                     />
                   </div>
                   <div className="grid md:grid-cols-2 gap-4">
+                    <Input
+                      label="Repeat Job Number"
+                      placeholder="e.g. CC-20250101-0001"
+                      {...register(`products.${index}.repeat_job_number`)}
+                    />
+                    <Input
+                      label="Other Job Number"
+                      placeholder="e.g. CC-20250101-0002"
+                      {...register(`products.${index}.other_job_number`)}
+                    />
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
                     <Select
                       label="Condition"
                       options={conditionOptions}
@@ -754,7 +772,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                     defaultValue={[]}
                     render={({ field: f }) => (
                       <ChipInput
-                        label="Other Parts"
+                        label="Other"
                         value={f.value || []}
                         onChange={f.onChange}
                         placeholder="Add part, press Enter (e.g. Original box)"
