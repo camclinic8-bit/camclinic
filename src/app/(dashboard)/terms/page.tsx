@@ -90,6 +90,7 @@ export default function TermsAndConditionsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Selected branch ID:', selectedBranchId);
     if (!selectedBranchId) {
       toast.error('Please select a branch first');
       return;
