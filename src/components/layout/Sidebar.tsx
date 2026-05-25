@@ -29,7 +29,6 @@ const navigation = [
   { name: 'Team', href: '/technicians', icon: Users2, roles: ['super_admin', 'service_manager', 'service_incharge'] },
   { name: 'Branches', href: '/branches', icon: Building2, roles: ['super_admin', 'service_manager', 'service_incharge'] },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
-  { name: 'Terms and Conditions', href: '/settings/terms', icon: FileText },
 ];
 
 export function Sidebar() {
