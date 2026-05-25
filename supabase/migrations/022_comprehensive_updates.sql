@@ -391,6 +391,117 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================================
+-- 5.5. Update RPC function: sync_job_products
+-- ============================================================================
+CREATE OR REPLACE FUNCTION sync_job_products(
+  p_job_id UUID,
+  p_products JSONB
+)
+RETURNS JSONB AS $$
+DECLARE
+  v_product_id UUID;
+  v_product JSONB;
+  v_accessory TEXT;
+  v_other_part TEXT;
+  v_existing_product_ids UUID[];
+  v_incoming_product_ids UUID[];
+  v_result JSONB;
+BEGIN
+  SELECT ARRAY_AGG(id) INTO v_existing_product_ids
+  FROM job_products
+  WHERE job_id = p_job_id;
+  
+  SELECT ARRAY_AGG((elem->>'id')::UUID) INTO v_incoming_product_ids
+  FROM jsonb_array_elements(p_products) elem
+  WHERE (elem->>'id') IS NOT NULL AND (elem->>'id') != '';
+  
+  IF v_existing_product_ids IS NOT NULL THEN
+    DELETE FROM job_products
+    WHERE job_id = p_job_id
+    AND id NOT IN (SELECT UNNEST(COALESCE(v_incoming_product_ids, ARRAY[]::UUID[])));
+  END IF;
+  
+  FOR v_product IN SELECT * FROM jsonb_array_elements(p_products) LOOP
+    IF (v_product->>'id') IS NOT NULL AND (v_product->>'id') != '' THEN
+      UPDATE job_products SET
+        brand = v_product->>'brand',
+        model = v_product->>'model',
+        serial_number = v_product->>'serial_number',
+        condition = (v_product->>'condition')::product_condition,
+        description = v_product->>'description',
+        remarks = v_product->>'remarks',
+        has_warranty = (v_product->>'has_warranty')::BOOLEAN,
+        warranty_description = v_product->>'warranty_description',
+        warranty_expiry_date = CASE WHEN (v_product->>'warranty_expiry_date') IS NOT NULL AND (v_product->>'warranty_expiry_date') != '' 
+                                  THEN (v_product->>'warranty_expiry_date')::DATE 
+                                  ELSE NULL 
+                             END,
+        repeat_job_number = v_product->>'repeat_job_number',
+        other_job_number = v_product->>'other_job_number',
+        updated_at = NOW()
+      WHERE id = (v_product->>'id')::UUID AND job_id = p_job_id;
+      
+      DELETE FROM product_accessories WHERE job_product_id = (v_product->>'id')::UUID;
+      INSERT INTO product_accessories (job_product_id, name)
+      SELECT (v_product->>'id')::UUID, jsonb_array_elements_text(v_product->'accessories')
+      WHERE jsonb_array_length(v_product->'accessories') > 0;
+      
+      DELETE FROM product_other_parts WHERE job_product_id = (v_product->>'id')::UUID;
+      INSERT INTO product_other_parts (job_product_id, name)
+      SELECT (v_product->>'id')::UUID, jsonb_array_elements_text(v_product->'other_parts')
+      WHERE jsonb_array_length(v_product->'other_parts') > 0;
+    ELSE
+      INSERT INTO job_products (
+        job_id,
+        brand,
+        model,
+        serial_number,
+        condition,
+        description,
+        remarks,
+        has_warranty,
+        warranty_description,
+        warranty_expiry_date,
+        repeat_job_number,
+        other_job_number
+      ) VALUES (
+        p_job_id,
+        v_product->>'brand',
+        v_product->>'model',
+        v_product->>'serial_number',
+        (v_product->>'condition')::product_condition,
+        v_product->>'description',
+        v_product->>'remarks',
+        (v_product->>'has_warranty')::BOOLEAN,
+        v_product->>'warranty_description',
+        CASE WHEN (v_product->>'warranty_expiry_date') IS NOT NULL AND (v_product->>'warranty_expiry_date') != '' 
+             THEN (v_product->>'warranty_expiry_date')::DATE 
+             ELSE NULL 
+        END,
+        v_product->>'repeat_job_number',
+        v_product->>'other_job_number'
+      ) RETURNING id INTO v_product_id;
+      
+      INSERT INTO product_accessories (job_product_id, name)
+      SELECT v_product_id, jsonb_array_elements_text(v_product->'accessories')
+      WHERE jsonb_array_length(v_product->'accessories') > 0;
+      
+      INSERT INTO product_other_parts (job_product_id, name)
+      SELECT v_product_id, jsonb_array_elements_text(v_product->'other_parts')
+      WHERE jsonb_array_length(v_product->'other_parts') > 0;
+    END IF;
+  END LOOP;
+  
+  v_result := jsonb_build_object('id', p_job_id);
+  RETURN v_result;
+  
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE EXCEPTION 'Failed to sync job products: %', SQLERRM;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
 -- 6. Update GST calculation trigger
 -- ============================================================================
 CREATE OR REPLACE FUNCTION calculate_job_totals()
