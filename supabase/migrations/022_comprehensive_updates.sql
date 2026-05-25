@@ -16,6 +16,11 @@ ADD COLUMN IF NOT EXISTS spare_parts_total_cost NUMERIC DEFAULT 0;
 COMMENT ON COLUMN jobs.spare_parts_total_cost IS 'Total cost of spare parts for office use only. Not shown in customer bills.';
 
 -- ============================================================================
+-- 1.5. Add index on job_number for faster job number generation
+-- ============================================================================
+CREATE INDEX IF NOT EXISTS idx_jobs_job_number ON jobs(job_number);
+
+-- ============================================================================
 -- 2. Add repeat_job_number and other_job_number to job_products table
 -- ============================================================================
 ALTER TABLE job_products
@@ -125,15 +130,15 @@ BEGIN
       v_product->>'other_job_number'
     ) RETURNING id INTO v_product_id;
     
-    FOR v_accessory IN SELECT jsonb_array_elements_text(v_product->'accessories') LOOP
-      INSERT INTO product_accessories (job_product_id, name)
-      VALUES (v_product_id, v_accessory);
-    END LOOP;
+    -- Bulk insert accessories
+    INSERT INTO product_accessories (job_product_id, name)
+    SELECT v_product_id, jsonb_array_elements_text(v_product->'accessories')
+    WHERE jsonb_array_length(v_product->'accessories') > 0;
     
-    FOR v_other_part IN SELECT jsonb_array_elements_text(v_product->'other_parts') LOOP
-      INSERT INTO product_other_parts (job_product_id, name)
-      VALUES (v_product_id, v_other_part);
-    END LOOP;
+    -- Bulk insert other parts
+    INSERT INTO product_other_parts (job_product_id, name)
+    SELECT v_product_id, jsonb_array_elements_text(v_product->'other_parts')
+    WHERE jsonb_array_length(v_product->'other_parts') > 0;
   END LOOP;
   
   INSERT INTO job_status_history (
@@ -272,16 +277,14 @@ BEGIN
         WHERE id = (v_product->>'id')::UUID AND job_id = p_job_id;
         
         DELETE FROM product_accessories WHERE job_product_id = (v_product->>'id')::UUID;
-        FOR v_accessory IN SELECT jsonb_array_elements_text(v_product->'accessories') LOOP
-          INSERT INTO product_accessories (job_product_id, name)
-          VALUES ((v_product->>'id')::UUID, v_accessory);
-        END LOOP;
+        INSERT INTO product_accessories (job_product_id, name)
+        SELECT (v_product->>'id')::UUID, jsonb_array_elements_text(v_product->'accessories')
+        WHERE jsonb_array_length(v_product->'accessories') > 0;
         
         DELETE FROM product_other_parts WHERE job_product_id = (v_product->>'id')::UUID;
-        FOR v_other_part IN SELECT jsonb_array_elements_text(v_product->'other_parts') LOOP
-          INSERT INTO product_other_parts (job_product_id, name)
-          VALUES ((v_product->>'id')::UUID, v_other_part);
-        END LOOP;
+        INSERT INTO product_other_parts (job_product_id, name)
+        SELECT (v_product->>'id')::UUID, jsonb_array_elements_text(v_product->'other_parts')
+        WHERE jsonb_array_length(v_product->'other_parts') > 0;
       ELSE
         INSERT INTO job_products (
           job_id,
@@ -314,15 +317,15 @@ BEGIN
           v_product->>'other_job_number'
         ) RETURNING id INTO v_product_id;
         
-        FOR v_accessory IN SELECT jsonb_array_elements_text(v_product->'accessories') LOOP
-          INSERT INTO product_accessories (job_product_id, name)
-          VALUES (v_product_id, v_accessory);
-        END LOOP;
+        -- Bulk insert accessories
+        INSERT INTO product_accessories (job_product_id, name)
+        SELECT v_product_id, jsonb_array_elements_text(v_product->'accessories')
+        WHERE jsonb_array_length(v_product->'accessories') > 0;
         
-        FOR v_other_part IN SELECT jsonb_array_elements_text(v_product->'other_parts') LOOP
-          INSERT INTO product_other_parts (job_product_id, name)
-          VALUES (v_product_id, v_other_part);
-        END LOOP;
+        -- Bulk insert other parts
+        INSERT INTO product_other_parts (job_product_id, name)
+        SELECT v_product_id, jsonb_array_elements_text(v_product->'other_parts')
+        WHERE jsonb_array_length(v_product->'other_parts') > 0;
       END IF;
     END LOOP;
   END IF;
