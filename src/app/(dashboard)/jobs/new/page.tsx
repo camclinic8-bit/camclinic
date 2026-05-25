@@ -2,48 +2,61 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, Controller, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Trash2, Search } from 'lucide-react';
+import { Plus, Trash2, Search, ArrowLeft } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { ChipInput } from '@/components/ui/ChipInput';
+import { ProductWarrantyFields } from '@/components/jobs/ProductWarrantyFields';
+import { AccessoryCheckboxList } from '@/components/inventory/AccessoryCheckboxList';
 import { useCreateJob } from '@/hooks/useJobs';
 import { useSearchCustomers, useCreateCustomer } from '@/hooks/useCustomers';
 import { useBranches } from '@/hooks/useBranches';
 import { useTechnicians, useServiceIncharges } from '@/hooks/useTechnicians';
-import { JOB_PRIORITY_LABELS, PRODUCT_CONDITION_LABELS, ProductCondition, JobPriority } from '@/types/enums';
+import { JOB_PRIORITY_LABELS, PRODUCT_CONDITION_LABELS, ProductCondition } from '@/types/enums';
 import { Customer } from '@/types/customer';
+import { toast } from 'sonner';
+import {
+  chipStringArray,
+  optionalDateInput,
+  optionalNonNegativeNumber,
+  optionalStr,
+} from '@/lib/validation/optionalFields';
 
 const productSchema = z.object({
-  brand: z.string().optional(),
-  model: z.string().optional(),
-  serial_number: z.string().optional(),
-  condition: z.string().optional(),
-  description: z.string().optional(),
-  remarks: z.string().optional(),
-  has_warranty: z.boolean().optional(),
-  warranty_description: z.string().optional(),
-  warranty_expiry_date: z.string().optional(),
-  accessories: z.string().optional(),
-  other_parts: z.string().optional(),
+  brand: optionalStr,
+  model: optionalStr,
+  serial_number: optionalStr,
+  condition: optionalStr,
+  description: optionalStr,
+  remarks: optionalStr,
+  has_warranty: z.coerce.boolean().default(false),
+  warranty_description: optionalStr,
+  warranty_expiry_date: optionalStr,
+  repeat_job_number: optionalStr,
+  other_job_number: optionalStr,
+  accessories: chipStringArray,
+  other_parts: chipStringArray,
 });
 
 const jobSchema = z.object({
   customer_id: z.string().min(1, 'Customer is required'),
   service_branch_id: z.string().min(1, 'Service branch is required'),
   delivery_branch_id: z.string().min(1, 'Delivery branch is required'),
-  assigned_incharge_id: z.string().optional(),
-  assigned_technician_id: z.string().optional(),
+  assigned_incharge_id: optionalStr,
+  assigned_technician_id: optionalStr,
   priority: z.enum(['immediate', 'high', 'medium', 'low']),
-  description: z.string().optional(),
-  inspection_fee: z.number().min(0).optional(),
-  advance_paid: z.number().min(0).optional(),
-  advance_paid_date: z.string().optional(),
-  estimate_delivery_date: z.string().optional(),
+  description: optionalStr,
+  inspection_fee: optionalNonNegativeNumber,
+  advance_paid: optionalNonNegativeNumber,
+  advance_paid_date: optionalDateInput,
+  estimate_delivery_date: optionalDateInput,
+  spare_parts_total_cost: optionalNonNegativeNumber,
   products: z.array(productSchema).min(1, 'At least one product is required'),
 });
 
@@ -68,19 +81,19 @@ export default function NewJobPage() {
     handleSubmit,
     control,
     setValue,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<JobFormData>({
-    resolver: zodResolver(jobSchema),
+    resolver: zodResolver(jobSchema) as Resolver<JobFormData>,
     defaultValues: {
       priority: 'medium',
-      products: [{}],
+      products: [{ has_warranty: false, accessories: [], other_parts: [] }],
     },
   });
 
   const { fields, append, remove } = useFieldArray({
     control,
     name: 'products',
+    keyName: '_rhfId',
   });
 
   const priorityOptions = Object.entries(JOB_PRIORITY_LABELS).map(([value, label]) => ({
@@ -110,8 +123,22 @@ export default function NewJobPage() {
   };
 
   const handleCreateCustomer = async () => {
+    const name = newCustomerData.name.trim();
+    const phone = newCustomerData.phone.trim();
+    if (!name) {
+      toast.error('Customer name is required');
+      return;
+    }
+    if (!phone) {
+      toast.error('Phone number is required');
+      return;
+    }
     try {
-      const customer = await createCustomer.mutateAsync(newCustomerData);
+      const customer = await createCustomer.mutateAsync({
+        ...newCustomerData,
+        name,
+        phone,
+      });
       setSelectedCustomer(customer);
       setValue('customer_id', customer.id);
       setShowNewCustomer(false);
@@ -127,14 +154,19 @@ export default function NewJobPage() {
         ...data,
         assigned_incharge_id: data.assigned_incharge_id || null,
         assigned_technician_id: data.assigned_technician_id || null,
+        inspection_fee: data.inspection_fee ?? 0,
+        advance_paid: data.advance_paid ?? 0,
+        advance_paid_date: data.advance_paid_date?.trim() || null,
+        estimate_delivery_date: data.estimate_delivery_date?.trim() || null,
+        spare_parts_total_cost: data.spare_parts_total_cost ?? 0,
         products: data.products.map(p => ({
           ...p,
           condition: p.condition as ProductCondition || null,
-          accessories: p.accessories?.split(',').map(a => a.trim()).filter(Boolean) || [],
-          other_parts: p.other_parts?.split(',').map(a => a.trim()).filter(Boolean) || [],
+          accessories: p.accessories || [],
+          other_parts: p.other_parts || [],
         })),
       };
-      
+
       const job = await createJob.mutateAsync(jobInput);
       router.push(`/jobs/${job.id}`);
     } catch {
@@ -147,6 +179,17 @@ export default function NewJobPage() {
       <Header title="New Job" />
       
       <div className="flex-1 p-4 lg:p-6 overflow-y-auto">
+        <div className="max-w-4xl mx-auto mb-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.push('/jobs')}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Jobs
+          </Button>
+        </div>
         <form onSubmit={handleSubmit(onSubmit)} className="max-w-4xl mx-auto space-y-6">
           <Card>
             <CardHeader>
@@ -177,11 +220,16 @@ export default function NewJobPage() {
                     label="Name"
                     value={newCustomerData.name}
                     onChange={(e) => setNewCustomerData(d => ({ ...d, name: e.target.value }))}
+                    required
+                    placeholder="Customer name"
                   />
                   <Input
                     label="Phone"
                     value={newCustomerData.phone}
                     onChange={(e) => setNewCustomerData(d => ({ ...d, phone: e.target.value }))}
+                    required
+                    placeholder="Phone number (required)"
+                    autoComplete="tel"
                   />
                   <Input
                     label="Email (optional)"
@@ -293,18 +341,30 @@ export default function NewJobPage() {
               <div className="grid md:grid-cols-3 gap-4">
                 <Input
                   type="number"
-                  label="Inspection Fee (₹)"
+                  label="Inspection Fee (₹) (optional)"
                   {...register('inspection_fee', { valueAsNumber: true })}
                 />
                 <Input
                   type="number"
-                  label="Advance Paid (₹)"
+                  label="Advance Paid (₹) (optional)"
                   {...register('advance_paid', { valueAsNumber: true })}
                 />
                 <Input
                   type="date"
-                  label="Estimate Delivery"
+                  label="Estimate Delivery (optional)"
                   {...register('estimate_delivery_date')}
+                />
+              </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <Input
+                  type="number"
+                  label="Spare Parts Total Cost (₹) (Office Use Only)"
+                  {...register('spare_parts_total_cost', { valueAsNumber: true })}
+                />
+                <Input
+                  type="date"
+                  label="Advance Paid Date (optional)"
+                  {...register('advance_paid_date')}
                 />
               </div>
               <div>
@@ -327,7 +387,9 @@ export default function NewJobPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => append({})}
+                onClick={() =>
+                  append({ has_warranty: false, accessories: [], other_parts: [] })
+                }
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Add Product
@@ -335,7 +397,7 @@ export default function NewJobPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               {fields.map((field, index) => (
-                <div key={field.id} className="p-4 border rounded-lg space-y-4">
+                <div key={field._rhfId} className="p-4 border rounded-lg space-y-4">
                   <div className="flex justify-between items-center">
                     <h4 className="font-medium">Product {index + 1}</h4>
                     {fields.length > 1 && (
@@ -364,23 +426,59 @@ export default function NewJobPage() {
                     />
                   </div>
                   <div className="grid md:grid-cols-2 gap-4">
+                    <Input
+                      label="Repeat Job Number"
+                      placeholder="e.g. CC-20250101-0001"
+                      {...register(`products.${index}.repeat_job_number`)}
+                    />
+                    <Input
+                      label="Other Job Number"
+                      placeholder="e.g. CC-20250101-0002"
+                      {...register(`products.${index}.other_job_number`)}
+                    />
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
                     <Select
                       label="Condition"
                       options={conditionOptions}
                       placeholder="Select condition"
                       {...register(`products.${index}.condition`)}
                     />
-                    <Input
-                      label="Accessories (comma separated)"
-                      placeholder="Battery, Lens cap, Charger"
-                      {...register(`products.${index}.accessories`)}
+                    <Controller
+                      control={control}
+                      name={`products.${index}.accessories`}
+                      defaultValue={[]}
+                      render={({ field }) => (
+                        <AccessoryCheckboxList
+                          value={field.value || []}
+                          onChange={field.onChange}
+                        />
+                      )}
                     />
                   </div>
-                  <Input
-                    label="Other Parts (comma separated)"
-                    placeholder="Original box, Manual"
-                    {...register(`products.${index}.other_parts`)}
+                  <Controller
+                    control={control}
+                    name={`products.${index}.other_parts`}
+                    defaultValue={[]}
+                    render={({ field }) => (
+                      <ChipInput
+                        label="Other Parts"
+                        value={field.value || []}
+                        onChange={field.onChange}
+                        placeholder="Add part, press Enter (e.g. Original box)"
+                      />
+                    )}
                   />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Product Description
+                    </label>
+                    <textarea
+                      className="w-full border rounded-lg px-3 py-2 text-sm"
+                      rows={2}
+                      {...register(`products.${index}.description`)}
+                    />
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Remarks
@@ -391,6 +489,12 @@ export default function NewJobPage() {
                       {...register(`products.${index}.remarks`)}
                     />
                   </div>
+                  <ProductWarrantyFields
+                    control={control}
+                    index={index}
+                    register={register}
+                    setValue={setValue}
+                  />
                 </div>
               ))}
               {errors.products && (

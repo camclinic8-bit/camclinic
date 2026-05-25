@@ -1,36 +1,41 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { createClient } from '@/lib/supabase/client';
 import { 
   getJobs, 
   getJobById, 
   createJob, 
   updateJob, 
   updateJobStatus,
+  deleteJob,
   getJobCounts,
   getJobsDueToday 
 } from '@/lib/db/jobs';
+import { createClient } from '@/lib/supabase/client';
+import { queryKeys } from '@/lib/queryKeys';
 import { JobFilters, JobCreateInput, JobUpdateInput } from '@/types/job';
 import { JobStatus } from '@/types/enums';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
+import { isAppError } from '@/lib/errors';
 
 export function useJobs(filters?: JobFilters, page = 1, pageSize = 20) {
   const supabase = createClient();
   const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   // For technicians, override filters to only show their assigned jobs
-  const actualFilters = user?.role === 'technician' 
-    ? { ...filters, assignedTechnicianId: user.id }
+  const actualFilters = user?.role === 'technician'
+    ? { ...filters, technician_id: user.id }
     : filters;
 
   return useQuery({
-    queryKey: ['jobs', actualFilters, page.toString(), pageSize.toString(), user?.role, user?.id],
+    queryKey: queryKeys.jobs.list(actualFilters),
     queryFn: () => getJobs(supabase, actualFilters, page, pageSize),
-    staleTime: 60 * 1000, // 1 minute
+    placeholderData: (previousData) => previousData,
+    staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
-    enabled: !!user,
+    enabled: isAuthenticated,
   });
 }
 
@@ -38,9 +43,12 @@ export function useJob(id: string) {
   const supabase = createClient();
 
   return useQuery({
-    queryKey: ['job', id],
+    queryKey: queryKeys.jobs.detail(id),
     queryFn: () => getJobById(supabase, id),
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
     enabled: !!id,
   });
 }
@@ -58,12 +66,13 @@ export function useCreateJob() {
       return createJob(supabase, input, user.shop_id, user.id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
-      queryClient.invalidateQueries({ queryKey: ['jobCounts'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.counts() });
       toast.success('Job created successfully');
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to create job');
+      const message = isAppError(error) ? error.message : 'Failed to create job';
+      toast.error(message);
     },
   });
 }
@@ -81,13 +90,14 @@ export function useUpdateJob() {
       return updateJob(supabase, id, input, user.id);
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
-      queryClient.invalidateQueries({ queryKey: ['job', variables.id] });
-      queryClient.invalidateQueries({ queryKey: ['jobCounts'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.detail(variables.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.counts() });
       toast.success('Job updated successfully');
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to update job');
+      const message = isAppError(error) ? error.message : 'Failed to update job';
+      toast.error(message);
     },
   });
 }
@@ -105,39 +115,60 @@ export function useUpdateJobStatus() {
       return updateJobStatus(supabase, id, status, user.id, notes);
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
-      queryClient.invalidateQueries({ queryKey: ['job', variables.id] });
-      queryClient.invalidateQueries({ queryKey: ['jobCounts'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.detail(variables.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.counts() });
       toast.success('Status updated successfully');
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to update status');
+      const message = isAppError(error) ? error.message : 'Failed to update status';
+      toast.error(message);
+    },
+  });
+}
+
+export function useDeleteJob() {
+  const queryClient = useQueryClient();
+  const supabase = createClient();
+
+  return useMutation({
+    mutationFn: (id: string) => deleteJob(supabase, id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.detail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.counts() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.dueToday() });
+      toast.success('Job deleted');
+    },
+    onError: (error: Error) => {
+      const message = isAppError(error) ? error.message : 'Failed to delete job';
+      toast.error(message);
     },
   });
 }
 
 export function useJobCounts(branchId?: string) {
   const supabase = createClient();
-  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
-    queryKey: ['jobCounts', branchId, user?.role, user?.id],
+    queryKey: queryKeys.jobs.counts(branchId),
     queryFn: () => getJobCounts(supabase, branchId),
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
-    enabled: !!user,
+    enabled: isAuthenticated,
   });
 }
 
 export function useJobsDueToday(branchId?: string) {
   const supabase = createClient();
-  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
-    queryKey: ['jobsDueToday', branchId, user?.role, user?.id],
+    queryKey: queryKeys.jobs.dueToday(branchId),
     queryFn: () => getJobsDueToday(supabase, branchId),
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
-    enabled: !!user,
+    enabled: isAuthenticated,
   });
 }

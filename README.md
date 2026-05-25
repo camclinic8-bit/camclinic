@@ -40,7 +40,21 @@ A comprehensive camera service management software for multi-branch camera shops
 - **UI Components**: Custom components with Lucide icons
 - **PDF Generation**: jsPDF + jsPDF-autotable
 
-## 📋 Prerequisites
+## � Security
+
+### CVE-2026-45321 (TanStack Supply-Chain Attack)
+
+**Status**: ✅ **Not affected**
+
+On May 11, 2026, a supply-chain attack (CVE-2026-45321) compromised 84 malicious versions across 42 `@tanstack/*` npm packages from the router/start monorepo. 
+
+This project uses `@tanstack/react-query@5.95.2`, which is part of the **`@tanstack/query*` family**. The TanStack Query family was **not affected** by this attack as it is a separate monorepo from the compromised router/start packages.
+
+**No action required** - this project is safe from CVE-2026-45321.
+
+Reference: [GitHub Security Advisory GHSA-g7cv-rxg3-hmpx](https://github.com/TanStack/router/security/advisories/GHSA-g7cv-rxg3-hmpx)
+
+## �📋 Prerequisites
 
 - Node.js 18+ 
 - npm or yarn

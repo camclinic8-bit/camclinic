@@ -3,8 +3,8 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "Cam Clinic - Camera Service Management",
-  description: "Camera service management software by Supportta Solutions",
+  title: "CamClinic — Camera Service Management",
+  description: "Camera service management for workshops and service centres.",
 };
 
 export default function RootLayout({

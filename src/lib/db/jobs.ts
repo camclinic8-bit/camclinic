@@ -1,16 +1,24 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { normalizeJobProductWarrantyForDb } from '@/lib/utils/normalizeJobProduct';
+import { getLocalToday } from '@/lib/utils/dates';
 import { 
   Job, 
   JobWithRelations, 
   JobCreateInput, 
   JobUpdateInput, 
   JobFilters,
-  JobStatusHistory 
+  JobStatusHistory,
+  PaymentTransaction
 } from '@/types/job';
 import { JobStatus } from '@/types/enums';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TypedSupabaseClient = SupabaseClient<any>;
+
+/** Trim search; avoid commas (break PostgREST .or) and stray % in ilike patterns. */
+function sanitizeJobSearchTerm(raw: string): string {
+  return raw.trim().replace(/,/g, ' ').replace(/%/g, '');
+}
 
 export async function getJobs(
   supabase: TypedSupabaseClient,
@@ -18,22 +26,20 @@ export async function getJobs(
   page = 1,
   pageSize = 20
 ): Promise<{ data: JobWithRelations[]; count: number }> {
+  const sortBy = filters?.sort_by || 'created_at';
+  const sortOrder = filters?.sort_order || 'desc';
+
   let query = supabase
     .from('jobs')
     .select(`
       *,
-      customer:customers(*),
-      service_branch:branches!jobs_service_branch_id_fkey(*),
-      delivery_branch:branches!jobs_delivery_branch_id_fkey(*),
-      assigned_incharge:profiles!jobs_assigned_incharge_id_fkey(*),
-      assigned_technician:profiles!jobs_assigned_technician_id_fkey(*),
-      created_by_user:profiles!jobs_created_by_fkey(*),
-      products:job_products(
-        *,
-        accessories:product_accessories(*),
-        other_parts:product_other_parts(*)
-      ),
-      spare_parts(*)
+      customer:customers(id, name, phone, email),
+      service_branch:branches!jobs_service_branch_id_fkey(id, name),
+      delivery_branch:branches!jobs_delivery_branch_id_fkey(id, name),
+      assigned_incharge:profiles!jobs_assigned_incharge_id_fkey(id, full_name, phone),
+      assigned_technician:profiles!jobs_assigned_technician_id_fkey(id, full_name, phone),
+      created_by_user:profiles!jobs_created_by_fkey(id, full_name),
+      products:job_products(id, brand, model)
     `, { count: 'exact' });
 
   if (filters?.status) {
@@ -73,13 +79,38 @@ export async function getJobs(
   }
 
   if (filters?.search) {
-    query = query.or(`job_number.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
+    const term = sanitizeJobSearchTerm(filters.search);
+    if (term.length > 0) {
+      // Match jobs by job # / description, or by linked customer name / phone (RLS-scoped).
+      const digitsOnly = term.replace(/\D/g, '');
+      const customerOr = [
+        `name.ilike.%${term}%`,
+        `phone.ilike.%${term}%`,
+        ...(digitsOnly.length >= 4 && digitsOnly !== term ? [`phone.ilike.%${digitsOnly}%`] : []),
+      ].join(',');
+
+      const { data: matchingCustomers } = await supabase.from('customers').select('id').or(customerOr);
+
+      const orParts = [`job_number.ilike.%${term}%`, `description.ilike.%${term}%`];
+      const ids = matchingCustomers?.map((c) => c.id) ?? [];
+      if (ids.length > 0) {
+        // Use subquery approach to avoid IN clause limit
+        // Split into batches to avoid URL length limits
+        const batchSize = 100;
+        for (let i = 0; i < ids.length; i += batchSize) {
+          const batch = ids.slice(i, i + batchSize);
+          orParts.push(`customer_id.in.(${batch.join(',')})`);
+        }
+      }
+      query = query.or(orParts.join(','));
+    }
   }
 
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
   const { data, error, count } = await query
+    .order(sortBy, { ascending: sortOrder === 'asc', nullsFirst: false })
     .order('created_at', { ascending: false })
     .range(from, to);
 
@@ -97,25 +128,54 @@ export async function getJobById(
 ): Promise<JobWithRelations | null> {
   const { data, error } = await supabase
     .from('jobs')
-    .select(`
+    .select(
+      `
       *,
-      customer:customers(*),
-      service_branch:branches!jobs_service_branch_id_fkey(*),
-      delivery_branch:branches!jobs_delivery_branch_id_fkey(*),
-      assigned_incharge:profiles!jobs_assigned_incharge_id_fkey(*),
-      assigned_technician:profiles!jobs_assigned_technician_id_fkey(*),
-      created_by_user:profiles!jobs_created_by_fkey(*),
+      customer:customers(id, name, phone, email, address),
+      service_branch:branches!jobs_service_branch_id_fkey(id, name),
+      delivery_branch:branches!jobs_delivery_branch_id_fkey(id, name),
+      assigned_technician:profiles!jobs_assigned_technician_id_fkey(id, full_name),
       products:job_products(
-        *,
-        accessories:product_accessories(*),
-        other_parts:product_other_parts(*)
+        id,
+        job_id,
+        brand,
+        model,
+        serial_number,
+        condition,
+        description,
+        remarks,
+        has_warranty,
+        warranty_description,
+        warranty_expiry_date,
+        repeat_job_number,
+        other_job_number,
+        accessories:product_accessories(id, job_product_id, name),
+        other_parts:product_other_parts(id, job_product_id, name)
       ),
-      spare_parts(*),
+      spare_parts(id, job_id, name, quantity, unit_price, total_price),
       status_history:job_status_history(
-        *,
-        changed_by_user:profiles(*)
+        id,
+        job_id,
+        from_status,
+        to_status,
+        changed_by,
+        notes,
+        created_at,
+        changed_by_user:profiles!job_status_history_changed_by_fkey(id, full_name)
+      ),
+      payment_transactions:payment_transactions(
+        id,
+        job_id,
+        amount,
+        payment_date,
+        payment_method,
+        notes,
+        created_by,
+        created_at,
+        created_by_user:profiles!payment_transactions_created_by_fkey(id, full_name)
       )
-    `)
+    `
+    )
     .eq('id', id)
     .single();
 
@@ -124,7 +184,13 @@ export async function getJobById(
     throw error;
   }
 
-  return data as unknown as JobWithRelations;
+  const row = data as unknown as JobWithRelations;
+  if (row.status_history?.length) {
+    row.status_history = [...row.status_history].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+  }
+  return row;
 }
 
 export async function createJob(
@@ -133,95 +199,54 @@ export async function createJob(
   shopId: string,
   createdBy: string
 ): Promise<Job> {
-  // Get next job number
-  const { data: jobNumberData, error: jobNumberError } = await supabase
-    .rpc('get_next_job_number');
+  // Use transaction-safe RPC function
+  const productsJson = input.products.map(p => ({
+    brand: p.brand,
+    model: p.model,
+    serial_number: p.serial_number,
+    condition: p.condition,
+    description: p.description,
+    remarks: p.remarks,
+    has_warranty: p.has_warranty,
+    warranty_description: p.warranty_description,
+    warranty_expiry_date: p.warranty_expiry_date,
+    repeat_job_number: p.repeat_job_number,
+    other_job_number: p.other_job_number,
+    accessories: p.accessories || [],
+    other_parts: p.other_parts || [],
+  }));
 
-  if (jobNumberError) throw jobNumberError;
+  const { data, error } = await supabase
+    .rpc('create_job_with_products', {
+      p_shop_id: shopId,
+      p_customer_id: input.customer_id,
+      p_service_branch_id: input.service_branch_id,
+      p_delivery_branch_id: input.delivery_branch_id,
+      p_created_by: createdBy,
+      p_assigned_incharge_id: input.assigned_incharge_id ?? null,
+      p_assigned_technician_id: input.assigned_technician_id ?? null,
+      p_priority: input.priority,
+      p_description: input.description ?? null,
+      p_inspection_fee: input.inspection_fee ?? 0,
+      p_advance_paid: input.advance_paid ?? 0,
+      p_advance_paid_date: input.advance_paid && input.advance_paid > 0
+        ? input.advance_paid_date?.trim() || null
+        : null,
+      p_estimate_delivery_date: input.estimate_delivery_date?.trim() || null,
+      p_spare_parts_total_cost: input.spare_parts_total_cost ?? 0,
+      p_products: productsJson,
+    });
 
-  const jobNumber = jobNumberData as string;
+  if (error) throw error;
 
-  // Create the job
-  const { data: job, error: jobError } = await supabase
+  // Fetch the complete job with relations
+  const { data: job, error: fetchError } = await supabase
     .from('jobs')
-    .insert({
-      shop_id: shopId,
-      job_number: jobNumber,
-      customer_id: input.customer_id,
-      service_branch_id: input.service_branch_id,
-      delivery_branch_id: input.delivery_branch_id,
-      assigned_incharge_id: input.assigned_incharge_id,
-      assigned_technician_id: input.assigned_technician_id,
-      priority: input.priority,
-      description: input.description,
-      inspection_fee: input.inspection_fee || 0,
-      advance_paid: input.advance_paid || 0,
-      advance_paid_date: input.advance_paid && input.advance_paid > 0 ? input.advance_paid_date : null,
-      estimate_delivery_date: input.estimate_delivery_date,
-      created_by: createdBy,
-      status: 'new',
-    })
-    .select()
+    .select('*')
+    .eq('id', (data as { id: string }).id)
     .single();
 
-  if (jobError) throw jobError;
-
-  // Create job products
-  for (const product of input.products) {
-    const { data: jobProduct, error: productError } = await supabase
-      .from('job_products')
-      .insert({
-        job_id: job.id,
-        brand: product.brand,
-        model: product.model,
-        serial_number: product.serial_number,
-        condition: product.condition,
-        description: product.description,
-        remarks: product.remarks,
-        has_warranty: product.has_warranty || false,
-        warranty_description: product.warranty_description,
-        warranty_expiry_date: product.warranty_expiry_date,
-      })
-      .select()
-      .single();
-
-    if (productError) throw productError;
-
-    // Create accessories
-    if (product.accessories && product.accessories.length > 0) {
-      const accessories = product.accessories.map(name => ({
-        job_product_id: jobProduct.id,
-        name,
-      }));
-      const { error: accError } = await supabase
-        .from('product_accessories')
-        .insert(accessories);
-      if (accError) throw accError;
-    }
-
-    // Create other parts
-    if (product.other_parts && product.other_parts.length > 0) {
-      const otherParts = product.other_parts.map(name => ({
-        job_product_id: jobProduct.id,
-        name,
-      }));
-      const { error: partsError } = await supabase
-        .from('product_other_parts')
-        .insert(otherParts);
-      if (partsError) throw partsError;
-    }
-  }
-
-  // Create initial status history
-  await supabase
-    .from('job_status_history')
-    .insert({
-      job_id: job.id,
-      from_status: null,
-      to_status: 'new',
-      changed_by: createdBy,
-      notes: 'Job created',
-    });
+  if (fetchError) throw fetchError;
 
   return job as Job;
 }
@@ -232,38 +257,87 @@ export async function updateJob(
   input: JobUpdateInput,
   userId: string
 ): Promise<Job> {
-  // Get current job to check status change
-  const { data: currentJob } = await supabase
+  // Use transaction-safe RPC function for basic job update
+  // Note: Products are handled separately in the edit page for now
+  // This could be consolidated in a future refactor
+  const { data, error } = await supabase
+    .rpc('update_job_with_products', {
+      p_job_id: id,
+      p_status: input.status ?? null,
+      p_priority: input.priority ?? null,
+      p_service_branch_id: input.service_branch_id ?? null,
+      p_delivery_branch_id: input.delivery_branch_id ?? null,
+      p_assigned_incharge_id: input.assigned_incharge_id ?? null,
+      p_assigned_technician_id: input.assigned_technician_id ?? null,
+      p_description: input.description ?? null,
+      p_technician_notes: input.technician_notes ?? null,
+      p_cam_clinic_advisory_notes: input.cam_clinic_advisory_notes ?? null,
+      p_inspection_fee: input.inspection_fee ?? null,
+      p_service_charges: input.service_charges ?? null,
+      p_advance_paid: input.advance_paid ?? null,
+      p_advance_paid_date: input.advance_paid_date ?? null,
+      p_gst_enabled: input.gst_enabled ?? null,
+      p_estimate_delivery_date: input.estimate_delivery_date ?? null,
+      p_spare_parts_total_cost: input.spare_parts_total_cost ?? null,
+      p_user_id: userId,
+      p_products: null, // Products handled separately in edit page
+    });
+
+  if (error) throw error;
+
+  // Fetch the complete job with relations
+  const { data: job, error: fetchError } = await supabase
     .from('jobs')
-    .select('status')
+    .select('*')
     .eq('id', id)
     .single();
 
+  if (fetchError) throw fetchError;
+
+  return job as Job;
+}
+
+export async function addPaymentTransaction(
+  supabase: TypedSupabaseClient,
+  jobId: string,
+  amount: number,
+  userId: string,
+  paymentMethod: string = 'cash',
+  notes?: string
+): Promise<PaymentTransaction> {
   const { data, error } = await supabase
-    .from('jobs')
-    .update({
-      ...input,
-      updated_at: new Date().toISOString(),
+    .from('payment_transactions')
+    .insert({
+      job_id: jobId,
+      amount,
+      payment_method: paymentMethod,
+      notes: notes || null,
+      created_by: userId,
     })
-    .eq('id', id)
     .select()
     .single();
 
   if (error) throw error;
 
-  // Log status change if status was updated
-  if (input.status && currentJob && input.status !== currentJob.status) {
-    await supabase
-      .from('job_status_history')
-      .insert({
-        job_id: id,
-        from_status: currentJob.status,
-        to_status: input.status,
-        changed_by: userId,
-      });
-  }
+  return data as PaymentTransaction;
+}
 
-  return data as Job;
+export async function getPaymentTransactions(
+  supabase: TypedSupabaseClient,
+  jobId: string
+): Promise<PaymentTransaction[]> {
+  const { data, error } = await supabase
+    .from('payment_transactions')
+    .select(`
+      *,
+      created_by_user:profiles!payment_transactions_created_by_fkey(id, full_name)
+    `)
+    .eq('job_id', jobId)
+    .order('payment_date', { ascending: false });
+
+  if (error) throw error;
+
+  return (data as unknown as PaymentTransaction[]) || [];
 }
 
 export async function updateJobStatus(
@@ -273,42 +347,47 @@ export async function updateJobStatus(
   userId: string,
   notes?: string
 ): Promise<Job> {
-  const { data: currentJob } = await supabase
-    .from('jobs')
-    .select('status')
-    .eq('id', id)
-    .single();
-
-  const updateData: Partial<Job> = { status };
-  
-  // Set service_date when status becomes completed
-  if (status === 'completed') {
-    updateData.service_date = new Date().toISOString();
-  }
-
+  // Use transaction-safe RPC function
   const { data, error } = await supabase
-    .from('jobs')
-    .update(updateData)
-    .eq('id', id)
-    .select()
-    .single();
+    .rpc('update_job_status_with_history', {
+      p_job_id: id,
+      p_status: status,
+      p_user_id: userId,
+      p_notes: notes || null,
+    });
 
   if (error) throw error;
 
-  // Log status change
-  if (currentJob) {
-    await supabase
-      .from('job_status_history')
-      .insert({
-        job_id: id,
-        from_status: currentJob.status,
-        to_status: status,
-        changed_by: userId,
-        notes,
-      });
-  }
+  // Fetch the complete job with relations
+  const { data: job, error: fetchError } = await supabase
+    .from('jobs')
+    .select('*')
+    .eq('id', id)
+    .single();
 
-  return data as Job;
+  if (fetchError) throw fetchError;
+
+  return job as Job;
+}
+
+export async function deleteJob(
+  supabase: TypedSupabaseClient,
+  id: string
+): Promise<void> {
+  const { data, error } = await supabase
+    .from('jobs')
+    .delete()
+    .eq('id', id)
+    .select('id');
+
+  if (error) {
+    throw new Error(error.message || 'Failed to delete job');
+  }
+  if (!data?.length) {
+    throw new Error(
+      'Job was not deleted. You may need super admin access, or apply the latest database migrations.'
+    );
+  }
 }
 
 export async function getJobStatusHistory(
@@ -369,7 +448,7 @@ export async function getJobsDueToday(
   supabase: TypedSupabaseClient,
   branchId?: string
 ): Promise<JobWithRelations[]> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalToday();
 
   let query = supabase
     .from('jobs')
@@ -377,7 +456,8 @@ export async function getJobsDueToday(
       *,
       customer:customers(*),
       service_branch:branches!jobs_service_branch_id_fkey(*),
-      assigned_technician:profiles!jobs_assigned_technician_id_fkey(*)
+      assigned_technician:profiles!jobs_assigned_technician_id_fkey(*),
+      products:job_products(id, brand, model)
     `)
     .eq('estimate_delivery_date', today)
     .not('status', 'in', '("completed","cancelled")');

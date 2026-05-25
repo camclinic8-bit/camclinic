@@ -4,6 +4,13 @@ import { Customer, CustomerWithJobCount } from '@/types/customer';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TypedSupabaseClient = SupabaseClient<any>;
 
+
+
+/** Sanitize search input: strip commas (break PostgREST .or) and stray % in ilike patterns. */
+function sanitizeSearchTerm(raw: string): string {
+  return raw.trim().replace(/,/g, ' ').replace(/%/g, '');
+}
+
 export async function getCustomers(
   supabase: TypedSupabaseClient,
   search?: string,
@@ -15,7 +22,10 @@ export async function getCustomers(
     .select('*', { count: 'exact' });
 
   if (search) {
-    query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`);
+    const term = sanitizeSearchTerm(search);
+    if (term.length > 0) {
+      query = query.or(`name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%`);
+    }
   }
 
   const from = (page - 1) * pageSize;
@@ -53,10 +63,13 @@ export async function searchCustomers(
   query: string,
   limit = 10
 ): Promise<Customer[]> {
+  const term = sanitizeSearchTerm(query);
+  if (term.length === 0) return [];
+
   const { data, error } = await supabase
     .from('customers')
     .select('*')
-    .or(`name.ilike.%${query}%,phone.ilike.%${query}%`)
+    .or(`name.ilike.%${term}%,phone.ilike.%${term}%`)
     .limit(limit);
 
   if (error) throw error;
@@ -74,12 +87,13 @@ export async function createCustomer(
   },
   shopId: string
 ): Promise<Customer> {
+  const { name, phone } = input;
   const { data, error } = await supabase
     .from('customers')
     .insert({
       shop_id: shopId,
-      name: input.name,
-      phone: input.phone,
+      name,
+      phone,
       email: input.email,
       address: input.address,
     })
@@ -101,9 +115,11 @@ export async function updateCustomer(
     address?: string | null;
   }
 ): Promise<Customer> {
+  const payload = { ...input };
+
   const { data, error } = await supabase
     .from('customers')
-    .update(input)
+    .update(payload)
     .eq('id', id)
     .select()
     .single();

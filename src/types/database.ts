@@ -66,6 +66,7 @@ export interface Database {
           shop_id: string | null;
           branch_id: string | null;
           full_name: string;
+          email: string | null;
           phone: string | null;
           role: UserRole;
           is_active: boolean;
@@ -77,6 +78,7 @@ export interface Database {
           shop_id?: string | null;
           branch_id?: string | null;
           full_name: string;
+          email?: string | null;
           phone?: string | null;
           role?: UserRole;
           is_active?: boolean;
@@ -88,6 +90,7 @@ export interface Database {
           shop_id?: string | null;
           branch_id?: string | null;
           full_name?: string;
+          email?: string | null;
           phone?: string | null;
           role?: UserRole;
           is_active?: boolean;
@@ -391,6 +394,15 @@ export interface Database {
       job_status: JobStatus;
       job_priority: JobPriority;
       product_condition: ProductCondition;
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
     };
   };
 }

@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { JobStatus } from '@/types/enums';
+import { getLocalToday } from '@/lib/utils/dates';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TypedSupabaseClient = SupabaseClient<any>;
@@ -107,7 +108,7 @@ export async function getDashboardStats(
   supabase: TypedSupabaseClient,
   branchId?: string
 ): Promise<DashboardStats> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalToday();
 
   // Run all queries in parallel for faster loading
   const queries = [];

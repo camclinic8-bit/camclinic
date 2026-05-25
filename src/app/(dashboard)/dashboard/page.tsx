@@ -11,7 +11,7 @@ import {
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { JobCard } from '@/components/jobs/JobCard';
-import { useDashboardStats, useJobsReport } from '@/hooks/useReports';
+import { useDashboardStats } from '@/hooks/useReports';
 import { useJobsDueToday, useJobCounts } from '@/hooks/useJobs';
 import { useBranchStore } from '@/stores/branchStore';
 import { formatINR } from '@/lib/utils/currency';
@@ -77,11 +77,15 @@ export default function DashboardPage() {
                   <div className={`p-2 rounded-lg ${stat.color}`}>
                     <stat.icon className="h-5 w-5 text-white" />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <p className="text-xs text-gray-500">{stat.title}</p>
-                    <p className={`font-semibold text-gray-900 ${stat.isAmount ? 'text-sm' : 'text-lg'}`}>
-                      {statsLoading ? '-' : stat.value}
-                    </p>
+                    {statsLoading ? (
+                      <div className="h-6 bg-gray-200 rounded animate-pulse mt-1 w-16" />
+                    ) : (
+                      <p className={`font-semibold text-gray-900 ${stat.isAmount ? 'text-sm' : 'text-lg'}`}>
+                        {stat.value}
+                      </p>
+                    )}
                   </div>
                 </div>
               </CardContent>

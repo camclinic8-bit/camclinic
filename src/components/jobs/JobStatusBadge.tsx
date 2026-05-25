@@ -5,9 +5,11 @@ import { JobStatus, JOB_STATUS_LABELS } from '@/types/enums';
 
 interface JobStatusBadgeProps {
   status: JobStatus;
+  /** Default sm; use md in dense tables for readability */
+  size?: 'sm' | 'md';
 }
 
-export function JobStatusBadge({ status }: JobStatusBadgeProps) {
+export function JobStatusBadge({ status, size = 'sm' }: JobStatusBadgeProps) {
   const getVariant = (): 'default' | 'success' | 'warning' | 'danger' | 'info' | 'gray' => {
     switch (status) {
       case 'new':
@@ -36,7 +38,7 @@ export function JobStatusBadge({ status }: JobStatusBadgeProps) {
   };
 
   return (
-    <Badge variant={getVariant()}>
+    <Badge variant={getVariant()} size={size}>
       {JOB_STATUS_LABELS[status]}
     </Badge>
   );

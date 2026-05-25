@@ -1,6 +1,18 @@
 import { format, parseISO, isAfter, isBefore, isToday, addDays } from 'date-fns';
 
 /**
+ * Get today's date in local timezone as YYYY-MM-DD string
+ * This avoids UTC conversion issues in Asia/Calcutta timezone
+ */
+export function getLocalToday(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Format a date string to "01 Apr 2026" format
  */
 export function formatDate(date: string | Date | null | undefined): string {

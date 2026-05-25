@@ -5,6 +5,8 @@ export interface Profile {
   shop_id: string | null;
   branch_id: string | null;
   full_name: string;
+  /** Mirrored from auth.users.email when column exists (see migration 007). */
+  email?: string | null;
   phone: string | null;
   role: UserRole;
   is_active: boolean;

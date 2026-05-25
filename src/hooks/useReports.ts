@@ -7,26 +7,26 @@ import { useAuthStore } from '@/stores/authStore';
 
 export function useJobsReport(filters?: ReportFilters) {
   const supabase = createClient();
-  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: ['jobsReport', filters],
     queryFn: () => getJobsReport(supabase, filters),
-    staleTime: 0,
+    staleTime: 60 * 1000, // 1 minute
     refetchOnWindowFocus: false,
-    enabled: !!user,
+    enabled: isAuthenticated,
   });
 }
 
 export function useDashboardStats(branchId?: string) {
   const supabase = createClient();
-  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: ['dashboardStats', branchId],
     queryFn: () => getDashboardStats(supabase, branchId),
-    staleTime: 0,
+    staleTime: 60 * 1000, // 1 minute
     refetchOnWindowFocus: false,
-    enabled: !!user,
+    enabled: isAuthenticated,
   });
 }

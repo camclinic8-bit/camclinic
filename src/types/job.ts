@@ -4,6 +4,31 @@ import { Branch } from './branch';
 import { Profile } from './user';
 import { SparePart } from './billing';
 
+export interface PaymentTransaction {
+  id: string;
+  job_id: string;
+  amount: number;
+  payment_date: string;
+  payment_method: string;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  created_by_user?: {
+    id: string;
+    full_name: string;
+  };
+}
+
+export interface TermsAndConditions {
+  id: string;
+  title: string;
+  content: string;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface JobProduct {
   id: string;
   job_id: string;
@@ -16,6 +41,8 @@ export interface JobProduct {
   has_warranty: boolean;
   warranty_description: string | null;
   warranty_expiry_date: string | null;
+  repeat_job_number: string | null;
+  other_job_number: string | null;
   created_at: string;
   updated_at: string;
   accessories?: ProductAccessory[];
@@ -59,6 +86,7 @@ export interface Job {
   total_charges: number;
   grand_total: number;
   balance_amount: number;
+  spare_parts_total_cost: number;
   estimate_delivery_date: string | null;
   service_date: string | null;
   created_by: string;
@@ -76,6 +104,7 @@ export interface JobWithRelations extends Job {
   products?: JobProduct[];
   spare_parts?: SparePart[];
   status_history?: JobStatusHistory[];
+  payment_transactions?: PaymentTransaction[];
 }
 
 export interface JobStatusHistory {
@@ -109,6 +138,7 @@ export interface JobCreateInput {
   advance_paid?: number;
   advance_paid_date?: string | null;
   estimate_delivery_date?: string | null;
+  spare_parts_total_cost?: number;
   products: JobProductInput[];
 }
 
@@ -122,6 +152,8 @@ export interface JobProductInput {
   has_warranty?: boolean;
   warranty_description?: string | null;
   warranty_expiry_date?: string | null;
+  repeat_job_number?: string | null;
+  other_job_number?: string | null;
   accessories?: string[];
   other_parts?: string[];
 }
@@ -129,6 +161,8 @@ export interface JobProductInput {
 export interface JobUpdateInput {
   status?: JobStatus;
   priority?: JobPriority;
+  service_branch_id?: string;
+  delivery_branch_id?: string;
   assigned_incharge_id?: string | null;
   assigned_technician_id?: string | null;
   description?: string | null;
@@ -140,6 +174,7 @@ export interface JobUpdateInput {
   advance_paid_date?: string | null;
   gst_enabled?: boolean;
   estimate_delivery_date?: string | null;
+  spare_parts_total_cost?: number;
 }
 
 export interface JobFilters {
@@ -151,4 +186,6 @@ export interface JobFilters {
   date_from?: string;
   date_to?: string;
   search?: string;
+  sort_by?: 'created_at' | 'updated_at' | 'estimate_delivery_date' | 'job_number' | 'grand_total' | 'balance_amount' | 'status' | 'priority';
+  sort_order?: 'asc' | 'desc';
 }
