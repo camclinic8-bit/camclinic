@@ -433,6 +433,7 @@ CREATE INDEX IF NOT EXISTS idx_payment_transactions_date ON payment_transactions
 
 ALTER TABLE payment_transactions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view payment transactions" ON payment_transactions;
 CREATE POLICY "Users can view payment transactions"
   ON payment_transactions
   FOR SELECT
@@ -464,6 +465,7 @@ CREATE POLICY "Users can view payment transactions"
     )
   );
 
+DROP POLICY IF EXISTS "Authenticated users can insert payment transactions" ON payment_transactions;
 CREATE POLICY "Authenticated users can insert payment transactions"
   ON payment_transactions
   FOR INSERT
