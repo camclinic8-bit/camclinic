@@ -147,10 +147,16 @@ function RealtimeInitializer({ queryClient }: { queryClient: QueryClient }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => {
         void queryClient.invalidateQueries({ queryKey: ['jobs'] });
         void queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+        void queryClient.invalidateQueries({ queryKey: ['jobs', 'counts'] });
+        void queryClient.invalidateQueries({ queryKey: ['jobs', 'due-today'] });
+        void queryClient.invalidateQueries({ queryKey: ['reports', 'jobs'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'job_status_history' }, () => {
         void queryClient.invalidateQueries({ queryKey: ['jobs'] });
         void queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+        void queryClient.invalidateQueries({ queryKey: ['jobs', 'counts'] });
+        void queryClient.invalidateQueries({ queryKey: ['jobs', 'due-today'] });
+        void queryClient.invalidateQueries({ queryKey: ['reports', 'jobs'] });
       })
       .subscribe();
 
