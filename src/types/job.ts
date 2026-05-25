@@ -59,6 +59,7 @@ export interface Job {
   total_charges: number;
   grand_total: number;
   balance_amount: number;
+  spare_parts_total_cost: number;
   estimate_delivery_date: string | null;
   service_date: string | null;
   created_by: string;
@@ -109,6 +110,7 @@ export interface JobCreateInput {
   advance_paid?: number;
   advance_paid_date?: string | null;
   estimate_delivery_date?: string | null;
+  spare_parts_total_cost?: number;
   products: JobProductInput[];
 }
 
@@ -142,6 +144,7 @@ export interface JobUpdateInput {
   advance_paid_date?: string | null;
   gst_enabled?: boolean;
   estimate_delivery_date?: string | null;
+  spare_parts_total_cost?: number;
 }
 
 export interface JobFilters {

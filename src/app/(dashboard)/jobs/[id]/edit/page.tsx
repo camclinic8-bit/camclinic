@@ -88,6 +88,7 @@ const editJobSchema = z.object({
   advance_paid_date: optionalDateInput,
   gst_enabled: z.boolean(),
   estimate_delivery_date: optionalDateInput,
+  spare_parts_total_cost: nonNegativeNumberOrZero,
   products: z.array(productSchema).min(1, 'At least one product is required'),
 });
 
@@ -236,6 +237,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
         advance_paid_date: job.advance_paid_date || '',
         gst_enabled: job.gst_enabled,
         estimate_delivery_date: job.estimate_delivery_date || '',
+        spare_parts_total_cost: job.spare_parts_total_cost || 0,
         products: (job.products || []).map((p) => ({
           id: p.id,
           brand: p.brand || '',
@@ -386,6 +388,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
               : null,
           gst_enabled: data.gst_enabled,
           estimate_delivery_date: data.estimate_delivery_date?.trim() || null,
+          spare_parts_total_cost: data.spare_parts_total_cost ?? 0,
         },
       });
 
@@ -659,6 +662,13 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                   type="date"
                   label="Advance Paid Date (optional)"
                   {...register('advance_paid_date')}
+                />
+              </div>
+              <div>
+                <Input
+                  type="number"
+                  label="Spare Parts Total Cost (₹) (Office Use Only)"
+                  {...register('spare_parts_total_cost', { valueAsNumber: true })}
                 />
               </div>
               <div>

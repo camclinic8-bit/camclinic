@@ -54,6 +54,7 @@ const jobSchema = z.object({
   advance_paid: optionalNonNegativeNumber,
   advance_paid_date: optionalDateInput,
   estimate_delivery_date: optionalDateInput,
+  spare_parts_total_cost: optionalNonNegativeNumber,
   products: z.array(productSchema).min(1, 'At least one product is required'),
 });
 
@@ -155,6 +156,7 @@ export default function NewJobPage() {
         advance_paid: data.advance_paid ?? 0,
         advance_paid_date: data.advance_paid_date?.trim() || null,
         estimate_delivery_date: data.estimate_delivery_date?.trim() || null,
+        spare_parts_total_cost: data.spare_parts_total_cost ?? 0,
         products: data.products.map(p => ({
           ...p,
           condition: p.condition as ProductCondition || null,
@@ -338,6 +340,18 @@ export default function NewJobPage() {
                   type="date"
                   label="Estimate Delivery (optional)"
                   {...register('estimate_delivery_date')}
+                />
+              </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <Input
+                  type="number"
+                  label="Spare Parts Total Cost (₹) (Office Use Only)"
+                  {...register('spare_parts_total_cost', { valueAsNumber: true })}
+                />
+                <Input
+                  type="date"
+                  label="Advance Paid Date (optional)"
+                  {...register('advance_paid_date')}
                 />
               </div>
               <div>
