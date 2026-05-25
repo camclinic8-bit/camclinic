@@ -52,8 +52,13 @@ export default function TermsAndConditionsPage() {
       setIsModalOpen(false);
       setFormData({ title: '', content: '' });
     },
-    onError: () => {
-      toast.error('Failed to create terms and conditions');
+    onError: (error: any) => {
+      console.error('Create error:', error);
+      if (error.message?.includes('Shop with ID')) {
+        toast.error('Selected branch not found. Please select a valid branch.');
+      } else {
+        toast.error('Failed to create terms and conditions');
+      }
     },
   });
 
