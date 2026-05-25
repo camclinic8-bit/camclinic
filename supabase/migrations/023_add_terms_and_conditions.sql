@@ -72,3 +72,21 @@ COMMENT ON TABLE terms_and_conditions IS 'Terms and conditions that appear in re
 COMMENT ON COLUMN terms_and_conditions.title IS 'Title of the terms and conditions';
 COMMENT ON COLUMN terms_and_conditions.content IS 'Full content of the terms and conditions (supports multiline text)';
 COMMENT ON COLUMN terms_and_conditions.is_active IS 'Whether this terms and conditions is currently active';
+
+-- Insert default terms and conditions for all existing shops
+INSERT INTO terms_and_conditions (shop_id, title, content, is_active, created_by)
+SELECT 
+  id as shop_id,
+  'Terms and Conditions' as title,
+  '1. All items are accepted for service with the understanding that the customer is the rightful owner.
+2. The company is not responsible for any data loss or damage to memory cards, batteries, or accessories.
+3. Estimates provided are approximate and final charges may vary based on actual work required.
+4. Goods not collected within 30 days of completion may be disposed of without further notice.
+5. Payment is required upon collection of goods unless prior credit arrangements have been made.
+6. The company reserves the right to refuse service at its discretion.
+7. Warranty claims must be accompanied by the original job receipt and warranty card.
+8. The company is not liable for any consequential damages arising from the service or repair.' as content,
+  true as is_active,
+  (SELECT id FROM profiles WHERE role = 'super_admin' LIMIT 1) as created_by
+FROM shops
+ON CONFLICT DO NOTHING;
