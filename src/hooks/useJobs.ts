@@ -147,26 +147,26 @@ export function useDeleteJob() {
   });
 }
 
-export function useJobCounts() {
+export function useJobCounts(branchId?: string) {
   const supabase = createClient();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
-    queryKey: queryKeys.jobs.counts(),
-    queryFn: () => getJobCounts(supabase),
+    queryKey: queryKeys.jobs.counts(branchId),
+    queryFn: () => getJobCounts(supabase, branchId),
     staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
     enabled: isAuthenticated,
   });
 }
 
-export function useJobsDueToday() {
+export function useJobsDueToday(branchId?: string) {
   const supabase = createClient();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
-    queryKey: queryKeys.jobs.dueToday(),
-    queryFn: () => getJobsDueToday(supabase),
+    queryKey: queryKeys.jobs.dueToday(branchId),
+    queryFn: () => getJobsDueToday(supabase, branchId),
     staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
     enabled: isAuthenticated,

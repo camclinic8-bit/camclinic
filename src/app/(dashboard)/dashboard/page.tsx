@@ -20,8 +20,8 @@ import { JOB_STATUS_LABELS, JobStatus } from '@/types/enums';
 export default function DashboardPage() {
   const { selectedBranchId } = useBranchStore();
   const { data: stats, isLoading: statsLoading } = useDashboardStats(selectedBranchId || undefined);
-  const { data: jobsDueToday, isLoading: dueTodayLoading } = useJobsDueToday();
-  const { data: jobCounts, isLoading: countsLoading } = useJobCounts();
+  const { data: jobsDueToday, isLoading: dueTodayLoading } = useJobsDueToday(selectedBranchId || undefined);
+  const { data: jobCounts, isLoading: countsLoading } = useJobCounts(selectedBranchId || undefined);
 
   const statCards = [
     {

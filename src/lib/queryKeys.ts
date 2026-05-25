@@ -26,8 +26,8 @@ export const queryKeys = {
     all: ['jobs'] as const,
     list: (filters?: unknown) => ['jobs', 'list', filters] as const,
     detail: (id: string) => ['jobs', id] as const,
-    counts: () => ['jobs', 'counts'] as const,
-    dueToday: () => ['jobs', 'due-today'] as const,
+    counts: (branchId?: string) => ['jobs', 'counts', branchId] as const,
+    dueToday: (branchId?: string) => ['jobs', 'due-today', branchId] as const,
   },
   
   // Customers
