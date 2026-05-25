@@ -45,14 +45,8 @@ CREATE POLICY "Users can view payment transactions"
             AND profiles.role = 'service_incharge'
           )
           AND (
-            jobs.service_branch_id IN (
-              SELECT branch_id FROM profiles_branches
-              WHERE profile_id = auth.uid()
-            )
-            OR jobs.delivery_branch_id IN (
-              SELECT branch_id FROM profiles_branches
-              WHERE profile_id = auth.uid()
-            )
+            jobs.service_branch_id = (SELECT branch_id FROM profiles WHERE id = auth.uid())
+            OR jobs.delivery_branch_id = (SELECT branch_id FROM profiles WHERE id = auth.uid())
           )
         )
         -- Technicians see only their assigned jobs
