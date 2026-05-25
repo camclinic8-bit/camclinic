@@ -92,8 +92,13 @@ export async function getJobs(
       const orParts = [`job_number.ilike.%${term}%`, `description.ilike.%${term}%`];
       const ids = matchingCustomers?.map((c) => c.id) ?? [];
       if (ids.length > 0) {
-        const maxIn = 200;
-        orParts.push(`customer_id.in.(${ids.slice(0, maxIn).join(',')})`);
+        // Use subquery approach to avoid IN clause limit
+        // Split into batches to avoid URL length limits
+        const batchSize = 100;
+        for (let i = 0; i < ids.length; i += batchSize) {
+          const batch = ids.slice(i, i + batchSize);
+          orParts.push(`customer_id.in.(${batch.join(',')})`);
+        }
       }
       query = query.or(orParts.join(','));
     }
