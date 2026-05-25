@@ -6,6 +6,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 interface BranchState {
   selectedBranchId: string | null;
   setSelectedBranch: (branchId: string | null) => void;
+  resetBranch: () => void;
 }
 
 /**
@@ -30,6 +31,7 @@ export const useBranchStore = create<BranchState>()(
     (set) => ({
       selectedBranchId: null,
       setSelectedBranch: (branchId) => set({ selectedBranchId: branchId }),
+      resetBranch: () => set({ selectedBranchId: null }),
     }),
     {
       name: 'cam-clinic-branch',
