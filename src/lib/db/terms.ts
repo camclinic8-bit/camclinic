@@ -45,18 +45,6 @@ export async function createTermsAndConditions(
 ): Promise<TermsAndConditions> {
   console.log('Creating terms and conditions with input:', input);
   
-  // First check if the shop exists
-  const { data: shop, error: shopError } = await supabase
-    .from('shops')
-    .select('id')
-    .eq('id', input.shop_id)
-    .single();
-  
-  if (shopError || !shop) {
-    console.error('Shop not found:', input.shop_id, shopError);
-    throw new Error(`Shop with ID ${input.shop_id} not found`);
-  }
-  
   const { data, error } = await supabase
     .from('terms_and_conditions')
     .insert({
@@ -71,6 +59,9 @@ export async function createTermsAndConditions(
 
   if (error) {
     console.error('Error creating terms and conditions:', error);
+    if (error.code === '23503') {
+      throw new Error('The selected branch does not exist in the database. Please select a valid branch or contact your administrator.');
+    }
     throw error;
   }
   return data as TermsAndConditions;

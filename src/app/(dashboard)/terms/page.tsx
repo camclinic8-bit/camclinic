@@ -54,11 +54,7 @@ export default function TermsAndConditionsPage() {
     },
     onError: (error: any) => {
       console.error('Create error:', error);
-      if (error.message?.includes('Shop with ID')) {
-        toast.error('Selected branch not found. Please select a valid branch.');
-      } else {
-        toast.error('Failed to create terms and conditions');
-      }
+      toast.error(error.message || 'Failed to create terms and conditions');
     },
   });
 
