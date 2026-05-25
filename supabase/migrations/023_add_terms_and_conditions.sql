@@ -24,6 +24,9 @@ DROP POLICY IF EXISTS "Admins can view terms and conditions" ON terms_and_condit
 DROP POLICY IF EXISTS "Admins can insert terms and conditions" ON terms_and_conditions;
 DROP POLICY IF EXISTS "Admins can update terms and conditions" ON terms_and_conditions;
 DROP POLICY IF EXISTS "Super admins can delete terms and conditions" ON terms_and_conditions;
+DROP POLICY IF EXISTS "Authenticated users can view terms and conditions" ON terms_and_conditions;
+DROP POLICY IF EXISTS "Authenticated users can insert terms and conditions" ON terms_and_conditions;
+DROP POLICY IF EXISTS "Authenticated users can update terms and conditions" ON terms_and_conditions;
 
 -- All authenticated users can view terms and conditions
 CREATE POLICY "Authenticated users can view terms and conditions"
