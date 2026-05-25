@@ -30,6 +30,8 @@ import { formatDate, formatDateTime, isExpired, getLocalToday } from '@/lib/util
 import { formatINR } from '@/lib/utils/currency';
 import { JOB_STATUS_LABELS, PRODUCT_CONDITION_LABELS, JobStatus } from '@/types/enums';
 import { toast } from 'sonner';
+import { createClient } from '@/lib/supabase/client';
+import { addPaymentTransaction } from '@/lib/db/jobs';
 
 function roundMoney(n: number): number {
   return Math.round(n * 100) / 100;
@@ -41,7 +43,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const { data: job, isPending } = useJob(id);
   const updateStatus = useUpdateJobStatus();
   const updateCharges = useUpdateJobCharges(id);
-  const { canSetAnyStatus } = useAuth();
+  const { canSetAnyStatus, user } = useAuth();
 
   const [showPaymentInput, setShowPaymentInput] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -52,7 +54,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   };
 
   const handleRecordPayment = async () => {
-    if (!job) return;
+    if (!job || !user) return;
     const maxPay = roundMoney(job.balance_amount);
     const amount = roundMoney(parseFloat(paymentAmount));
     if (isNaN(amount) || amount <= 0) {
@@ -64,12 +66,23 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       return;
     }
     const newAdvance = roundMoney((job.advance_paid || 0) + amount);
+    
+    // Record payment transaction
+    const supabase = createClient();
+    try {
+      await addPaymentTransaction(supabase, job.id, amount, user.id, 'cash');
+    } catch (error) {
+      toast.error('Failed to record payment transaction');
+      return;
+    }
+    
     await updateCharges.mutateAsync({
       advance_paid: newAdvance,
       advance_paid_date: getLocalToday(),
     });
     setPaymentAmount('');
     setShowPaymentInput(false);
+    toast.success(`Payment of ${formatINR(amount)} recorded successfully`);
   };
 
   const handlePaymentAmountChange = (raw: string, balanceDue: number) => {
@@ -502,6 +515,29 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                         {formatINR(job.balance_amount)}
                       </span>
                     </div>
+
+                    {/* Payment History */}
+                    {job.payment_transactions && job.payment_transactions.length > 0 && (
+                      <div className="border-t pt-2 mt-2">
+                        <p className="text-gray-600 font-medium mb-2">Payment History</p>
+                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                          {job.payment_transactions.map((transaction) => (
+                            <div key={transaction.id} className="flex justify-between items-center text-xs bg-gray-50 p-2 rounded">
+                              <div>
+                                <span className="font-medium">{formatINR(transaction.amount)}</span>
+                                <span className="text-gray-500 ml-2">
+                                  {formatDateTime(transaction.payment_date)}
+                                </span>
+                                {transaction.created_by_user && (
+                                  <span className="text-gray-400 ml-2">by {transaction.created_by_user.full_name}</span>
+                                )}
+                              </div>
+                              <span className="text-gray-500 capitalize">{transaction.payment_method}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Record Payment */}
                     {job.balance_amount > 0 && (

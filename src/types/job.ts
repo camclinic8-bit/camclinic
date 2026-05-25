@@ -4,6 +4,21 @@ import { Branch } from './branch';
 import { Profile } from './user';
 import { SparePart } from './billing';
 
+export interface PaymentTransaction {
+  id: string;
+  job_id: string;
+  amount: number;
+  payment_date: string;
+  payment_method: string;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  created_by_user?: {
+    id: string;
+    full_name: string;
+  };
+}
+
 export interface JobProduct {
   id: string;
   job_id: string;
@@ -77,6 +92,7 @@ export interface JobWithRelations extends Job {
   products?: JobProduct[];
   spare_parts?: SparePart[];
   status_history?: JobStatusHistory[];
+  payment_transactions?: PaymentTransaction[];
 }
 
 export interface JobStatusHistory {

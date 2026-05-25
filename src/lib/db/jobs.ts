@@ -7,7 +7,8 @@ import {
   JobCreateInput, 
   JobUpdateInput, 
   JobFilters,
-  JobStatusHistory 
+  JobStatusHistory,
+  PaymentTransaction
 } from '@/types/job';
 import { JobStatus } from '@/types/enums';
 
@@ -159,6 +160,17 @@ export async function getJobById(
         notes,
         created_at,
         changed_by_user:profiles!job_status_history_changed_by_fkey(id, full_name)
+      ),
+      payment_transactions:payment_transactions(
+        id,
+        job_id,
+        amount,
+        payment_date,
+        payment_method,
+        notes,
+        created_by,
+        created_at,
+        created_by_user:profiles!payment_transactions_created_by_fkey(id, full_name)
       )
     `
     )
@@ -279,6 +291,49 @@ export async function updateJob(
   if (fetchError) throw fetchError;
 
   return job as Job;
+}
+
+export async function addPaymentTransaction(
+  supabase: TypedSupabaseClient,
+  jobId: string,
+  amount: number,
+  userId: string,
+  paymentMethod: string = 'cash',
+  notes?: string
+): Promise<PaymentTransaction> {
+  const { data, error } = await supabase
+    .from('payment_transactions')
+    .insert({
+      job_id: jobId,
+      amount,
+      payment_method: paymentMethod,
+      notes: notes || null,
+      created_by: userId,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return data as PaymentTransaction;
+}
+
+export async function getPaymentTransactions(
+  supabase: TypedSupabaseClient,
+  jobId: string
+): Promise<PaymentTransaction[]> {
+  const { data, error } = await supabase
+    .from('payment_transactions')
+    .select(`
+      *,
+      created_by_user:profiles!payment_transactions_created_by_fkey(id, full_name)
+    `)
+    .eq('job_id', jobId)
+    .order('payment_date', { ascending: false });
+
+  if (error) throw error;
+
+  return (data as unknown as PaymentTransaction[]) || [];
 }
 
 export async function updateJobStatus(
