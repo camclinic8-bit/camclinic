@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { use, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -28,6 +28,8 @@ import { useUpdateJobCharges } from '@/hooks/useBilling';
 import { useAuth } from '@/hooks/useAuth';
 import { formatDate, formatDateTime, isExpired, getLocalToday } from '@/lib/utils/dates';
 import { formatINR } from '@/lib/utils/currency';
+import { getActiveTermsAndConditions } from '@/lib/db/terms';
+import { useBranchStore } from '@/stores/branchStore';
 import { JOB_STATUS_LABELS, PRODUCT_CONDITION_LABELS, JobStatus } from '@/types/enums';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
@@ -44,9 +46,27 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const updateStatus = useUpdateJobStatus();
   const updateCharges = useUpdateJobCharges(id);
   const { canSetAnyStatus, user } = useAuth();
+  const { selectedBranchId } = useBranchStore();
 
   const [showPaymentInput, setShowPaymentInput] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [terms, setTerms] = useState<any>(null);
+
+  // Fetch active terms and conditions
+  useEffect(() => {
+    const fetchTerms = async () => {
+      if (selectedBranchId) {
+        const supabase = createClient();
+        try {
+          const activeTerms = await getActiveTermsAndConditions(supabase, selectedBranchId);
+          setTerms(activeTerms);
+        } catch (error) {
+          console.error('Failed to fetch terms:', error);
+        }
+      }
+    };
+    fetchTerms();
+  }, [selectedBranchId]);
 
   const handleStatusChange = async (newStatus: JobStatus) => {
     if (!job) return;
@@ -121,21 +141,21 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const handleDownloadReceipt = async () => {
     if (!job) return;
     const { generateReceipt, downloadPDF } = await import('@/lib/utils/pdf');
-    const doc = generateReceipt(job);
+    const doc = generateReceipt(job, terms);
     downloadPDF(doc, `receipt-${job.job_number}.pdf`);
   };
 
   const handleDownloadQuote = async () => {
     if (!job) return;
     const { generateQuote, downloadPDF } = await import('@/lib/utils/pdf');
-    const doc = generateQuote(job);
+    const doc = generateQuote(job, terms);
     downloadPDF(doc, `quote-${job.job_number}.pdf`);
   };
 
   const handleDownloadInvoice = async () => {
     if (!job) return;
     const { generateInvoice, downloadPDF } = await import('@/lib/utils/pdf');
-    const doc = generateInvoice(job);
+    const doc = generateInvoice(job, terms);
     downloadPDF(doc, `invoice-${job.job_number}.pdf`);
   };
 

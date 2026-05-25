@@ -15,6 +15,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Package,
+  Settings,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUIStore } from '@/stores/uiStore';
@@ -28,6 +29,7 @@ const navigation = [
   { name: 'Team', href: '/technicians', icon: Users2, roles: ['super_admin', 'service_manager', 'service_incharge'] },
   { name: 'Branches', href: '/branches', icon: Building2, roles: ['super_admin', 'service_manager', 'service_incharge'] },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
+  { name: 'Settings', href: '/settings/terms', icon: Settings, roles: ['super_admin', 'service_manager'] },
 ];
 
 export function Sidebar() {

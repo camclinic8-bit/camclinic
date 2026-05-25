@@ -19,6 +19,17 @@ export interface PaymentTransaction {
   };
 }
 
+export interface TermsAndConditions {
+  id: string;
+  shop_id: string;
+  title: string;
+  content: string;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface JobProduct {
   id: string;
   job_id: string;
