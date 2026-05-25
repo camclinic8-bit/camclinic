@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, Controller, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Trash2, Search } from 'lucide-react';
+import { Plus, Trash2, Search, ArrowLeft } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -177,6 +177,17 @@ export default function NewJobPage() {
       <Header title="New Job" />
       
       <div className="flex-1 p-4 lg:p-6 overflow-y-auto">
+        <div className="max-w-4xl mx-auto mb-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.push('/jobs')}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Jobs
+          </Button>
+        </div>
         <form onSubmit={handleSubmit(onSubmit)} className="max-w-4xl mx-auto space-y-6">
           <Card>
             <CardHeader>
