@@ -147,6 +147,8 @@ export async function getJobById(
         has_warranty,
         warranty_description,
         warranty_expiry_date,
+        repeat_job_number,
+        other_job_number,
         accessories:product_accessories(id, job_product_id, name),
         other_parts:product_other_parts(id, job_product_id, name)
       ),

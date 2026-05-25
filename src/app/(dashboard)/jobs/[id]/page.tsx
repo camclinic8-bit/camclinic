@@ -272,6 +272,23 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                           </div>
                         </div>
 
+                        {(product.repeat_job_number || product.other_job_number) && (
+                          <div className="grid grid-cols-2 gap-2">
+                            {product.repeat_job_number && (
+                              <div className="rounded-md bg-gray-50 p-3">
+                                <p className="text-xs text-gray-500">Repeat Job #</p>
+                                <p className="font-medium text-gray-900">{product.repeat_job_number}</p>
+                              </div>
+                            )}
+                            {product.other_job_number && (
+                              <div className="rounded-md bg-gray-50 p-3">
+                                <p className="text-xs text-gray-500">Other Job #</p>
+                                <p className="font-medium text-gray-900">{product.other_job_number}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         {product.description && (
                           <div>
                             <p className="text-xs text-gray-500 mb-1">Product Description</p>

@@ -31,6 +31,8 @@ export interface JobProduct {
   has_warranty: boolean;
   warranty_description: string | null;
   warranty_expiry_date: string | null;
+  repeat_job_number: string | null;
+  other_job_number: string | null;
   created_at: string;
   updated_at: string;
   accessories?: ProductAccessory[];

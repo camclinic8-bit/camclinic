@@ -85,7 +85,9 @@ BEGIN
       remarks,
       has_warranty,
       warranty_description,
-      warranty_expiry_date
+      warranty_expiry_date,
+      repeat_job_number,
+      other_job_number
     ) VALUES (
       v_job_id,
       v_product->>'brand',
@@ -99,7 +101,9 @@ BEGIN
       CASE WHEN (v_product->>'warranty_expiry_date') IS NOT NULL AND (v_product->>'warranty_expiry_date') != '' 
            THEN (v_product->>'warranty_expiry_date')::DATE 
            ELSE NULL 
-      END
+      END,
+      v_product->>'repeat_job_number',
+      v_product->>'other_job_number'
     ) RETURNING id INTO v_product_id;
     
     -- Insert accessories
@@ -263,6 +267,8 @@ BEGIN
                                     THEN (v_product->>'warranty_expiry_date')::DATE 
                                     ELSE NULL 
                                END,
+          repeat_job_number = v_product->>'repeat_job_number',
+          other_job_number = v_product->>'other_job_number',
           updated_at = NOW()
         WHERE id = (v_product->>'id')::UUID AND job_id = p_job_id;
         

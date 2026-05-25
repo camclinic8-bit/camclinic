@@ -56,6 +56,8 @@ const productSchema = z.object({
   has_warranty: z.coerce.boolean().default(false),
   warranty_description: optionalStr,
   warranty_expiry_date: optionalStr,
+  repeat_job_number: optionalStr,
+  other_job_number: optionalStr,
   accessories: chipStringArray,
   other_parts: chipStringArray,
 });
@@ -249,6 +251,8 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
           has_warranty: p.has_warranty,
           warranty_description: p.warranty_description || '',
           warranty_expiry_date: p.warranty_expiry_date || '',
+          repeat_job_number: p.repeat_job_number || '',
+          other_job_number: p.other_job_number || '',
           accessories: (p.accessories || [])
             .map((a) => a.name)
             .filter((n): n is string => typeof n === 'string' && n.trim().length > 0),
@@ -727,6 +731,18 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                     <Input
                       label="Serial Number"
                       {...register(`products.${index}.serial_number`)}
+                    />
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <Input
+                      label="Repeat Job Number"
+                      placeholder="e.g. CC-20250101-0001"
+                      {...register(`products.${index}.repeat_job_number`)}
+                    />
+                    <Input
+                      label="Other Job Number"
+                      placeholder="e.g. CC-20250101-0002"
+                      {...register(`products.${index}.other_job_number`)}
                     />
                   </div>
                   <div className="grid md:grid-cols-2 gap-4">
