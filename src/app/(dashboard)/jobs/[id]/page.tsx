@@ -647,6 +647,15 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                       </div>
                     </div>
                   )}
+                  {!job.estimate_delivery_date && (
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-gray-400" />
+                      <div>
+                        <p className="text-gray-500">Est. Delivery</p>
+                        <p className="font-medium text-gray-400">Not set</p>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
