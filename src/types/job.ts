@@ -21,7 +21,6 @@ export interface PaymentTransaction {
 
 export interface TermsAndConditions {
   id: string;
-  shop_id: string;
   title: string;
   content: string;
   is_active: boolean;

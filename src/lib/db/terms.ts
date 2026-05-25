@@ -5,13 +5,11 @@ import { TermsAndConditions } from '@/types/job';
 type TypedSupabaseClient = SupabaseClient<any>;
 
 export async function getActiveTermsAndConditions(
-  supabase: TypedSupabaseClient,
-  shopId: string
+  supabase: TypedSupabaseClient
 ): Promise<TermsAndConditions | null> {
   const { data, error } = await supabase
     .from('terms_and_conditions')
     .select('*')
-    .eq('shop_id', shopId)
     .eq('is_active', true)
     .single();
 
@@ -20,13 +18,11 @@ export async function getActiveTermsAndConditions(
 }
 
 export async function getAllTermsAndConditions(
-  supabase: TypedSupabaseClient,
-  shopId: string
+  supabase: TypedSupabaseClient
 ): Promise<TermsAndConditions[]> {
   const { data, error } = await supabase
     .from('terms_and_conditions')
     .select('*')
-    .eq('shop_id', shopId)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -36,7 +32,6 @@ export async function getAllTermsAndConditions(
 export async function createTermsAndConditions(
   supabase: TypedSupabaseClient,
   input: {
-    shop_id: string;
     title: string;
     content: string;
     is_active?: boolean;
@@ -48,7 +43,6 @@ export async function createTermsAndConditions(
   const { data, error } = await supabase
     .from('terms_and_conditions')
     .insert({
-      shop_id: input.shop_id,
       title: input.title,
       content: input.content,
       is_active: input.is_active ?? true,
@@ -59,9 +53,6 @@ export async function createTermsAndConditions(
 
   if (error) {
     console.error('Error creating terms and conditions:', error);
-    if (error.code === '23503') {
-      throw new Error('The selected branch does not exist in the database. Please select a valid branch or contact your administrator.');
-    }
     throw error;
   }
   return data as TermsAndConditions;

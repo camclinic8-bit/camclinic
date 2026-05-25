@@ -3,7 +3,6 @@
 
 CREATE TABLE IF NOT EXISTS terms_and_conditions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  shop_id UUID REFERENCES shops(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   content TEXT NOT NULL,
   is_active BOOLEAN DEFAULT TRUE,
@@ -13,7 +12,6 @@ CREATE TABLE IF NOT EXISTS terms_and_conditions (
 );
 
 -- Index for faster queries
-CREATE INDEX IF NOT EXISTS idx_terms_and_conditions_shop_id ON terms_and_conditions(shop_id);
 CREATE INDEX IF NOT EXISTS idx_terms_and_conditions_is_active ON terms_and_conditions(is_active);
 
 -- Row Level Security
@@ -59,15 +57,14 @@ CREATE POLICY "Super admins can delete terms and conditions"
   );
 
 -- Comment
-COMMENT ON TABLE terms_and_conditions IS 'Terms and conditions that appear in receipts, invoices, and other PDFs';
+COMMENT ON TABLE terms_and_conditions IS 'Terms and conditions that appear in receipts, invoices, and other PDFs (global, not per-branch)';
 COMMENT ON COLUMN terms_and_conditions.title IS 'Title of the terms and conditions';
 COMMENT ON COLUMN terms_and_conditions.content IS 'Full content of the terms and conditions (supports multiline text)';
 COMMENT ON COLUMN terms_and_conditions.is_active IS 'Whether this terms and conditions is currently active';
 
--- Insert default terms and conditions for all existing shops
-INSERT INTO terms_and_conditions (shop_id, title, content, is_active, created_by)
+-- Insert default terms and conditions (global, single record)
+INSERT INTO terms_and_conditions (title, content, is_active, created_by)
 SELECT 
-  id as shop_id,
   'Terms and Conditions' as title,
   '1. All items are accepted for service with the understanding that the customer is the rightful owner.
 2. The company is not responsible for any data loss or damage to memory cards, batteries, or accessories.
@@ -82,5 +79,5 @@ SELECT
     (SELECT id FROM profiles WHERE role = 'super_admin' LIMIT 1),
     (SELECT id FROM profiles LIMIT 1)
   ) as created_by
-FROM shops
 ON CONFLICT DO NOTHING;
+

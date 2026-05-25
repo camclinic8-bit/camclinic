@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useBranchStore } from '@/stores/branchStore';
 import { 
   getActiveTermsAndConditions, 
   createTermsAndConditions, 
@@ -15,14 +14,12 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { Modal } from '@/components/ui/Modal';
-import { BranchSelector } from '@/components/layout/BranchSelector';
 import { toast } from 'sonner';
 import { Edit, FileText, Save } from 'lucide-react';
 
 export default function TermsAndConditionsPage() {
   const supabase = createClient();
   const { user } = useAuth();
-  const { selectedBranchId } = useBranchStore();
   const queryClient = useQueryClient();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -33,15 +30,13 @@ export default function TermsAndConditionsPage() {
   });
 
   const { data: activeTerms, isLoading } = useQuery({
-    queryKey: ['activeTerms', selectedBranchId],
-    queryFn: () => selectedBranchId ? getActiveTermsAndConditions(supabase, selectedBranchId) : Promise.resolve(null),
-    enabled: !!selectedBranchId,
+    queryKey: ['activeTerms'],
+    queryFn: () => getActiveTermsAndConditions(supabase),
   });
 
   const createMutation = useMutation({
     mutationFn: (data: { title: string; content: string; userId: string }) =>
       createTermsAndConditions(supabase, {
-        shop_id: selectedBranchId || '',
         title: data.title,
         content: data.content,
         is_active: true,
@@ -90,11 +85,6 @@ export default function TermsAndConditionsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Selected branch ID:', selectedBranchId);
-    if (!selectedBranchId) {
-      toast.error('Please select a branch first');
-      return;
-    }
     if (editingTerms) {
       updateMutation.mutate({
         id: editingTerms.id,
@@ -124,15 +114,12 @@ export default function TermsAndConditionsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Terms and Conditions</h1>
           <p className="text-gray-500">Edit terms and conditions for receipts and invoices</p>
         </div>
-        <div className="flex items-center gap-4">
-          <BranchSelector />
-          {activeTerms && (
-            <Button onClick={() => handleOpenModal(activeTerms)}>
-              <Edit className="h-4 w-4 mr-2" />
-              Edit
-            </Button>
-          )}
-        </div>
+        {activeTerms && (
+          <Button onClick={() => handleOpenModal(activeTerms)}>
+            <Edit className="h-4 w-4 mr-2" />
+            Edit
+          </Button>
+        )}
       </div>
 
       {/* Active Terms */}

@@ -52,21 +52,19 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [paymentAmount, setPaymentAmount] = useState('');
   const [terms, setTerms] = useState<any>(null);
 
-  // Fetch active terms and conditions
+  // Fetch active terms and conditions (global)
   useEffect(() => {
     const fetchTerms = async () => {
-      if (selectedBranchId) {
-        const supabase = createClient();
-        try {
-          const activeTerms = await getActiveTermsAndConditions(supabase, selectedBranchId);
-          setTerms(activeTerms);
-        } catch (error) {
-          console.error('Failed to fetch terms:', error);
-        }
+      const supabase = createClient();
+      try {
+        const activeTerms = await getActiveTermsAndConditions(supabase);
+        setTerms(activeTerms);
+      } catch (error) {
+        console.error('Failed to fetch terms:', error);
       }
     };
     fetchTerms();
-  }, [selectedBranchId]);
+  }, []);
 
   const handleStatusChange = async (newStatus: JobStatus) => {
     if (!job) return;
