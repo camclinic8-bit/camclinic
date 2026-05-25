@@ -43,6 +43,7 @@ export async function createTermsAndConditions(
     created_by: string;
   }
 ): Promise<TermsAndConditions> {
+  console.log('Creating terms and conditions with input:', input);
   const { data, error } = await supabase
     .from('terms_and_conditions')
     .insert({
@@ -55,7 +56,10 @@ export async function createTermsAndConditions(
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error creating terms and conditions:', error);
+    throw error;
+  }
   return data as TermsAndConditions;
 }
 

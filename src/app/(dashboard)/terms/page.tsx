@@ -88,6 +88,10 @@ export default function TermsAndConditionsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedBranchId) {
+      toast.error('Please select a branch first');
+      return;
+    }
     if (editingTerms) {
       updateMutation.mutate({
         id: editingTerms.id,

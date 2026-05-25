@@ -75,6 +75,9 @@ SELECT
 7. Warranty claims must be accompanied by the original job receipt and warranty card.
 8. The company is not liable for any consequential damages arising from the service or repair.' as content,
   true as is_active,
-  (SELECT id FROM profiles WHERE role = 'super_admin' LIMIT 1) as created_by
+  COALESCE(
+    (SELECT id FROM profiles WHERE role = 'super_admin' LIMIT 1),
+    (SELECT id FROM profiles LIMIT 1)
+  ) as created_by
 FROM shops
 ON CONFLICT DO NOTHING;
