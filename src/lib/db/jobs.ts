@@ -211,6 +211,7 @@ export async function createJob(
         ? input.advance_paid_date?.trim() || null
         : null,
       p_estimate_delivery_date: input.estimate_delivery_date?.trim() || null,
+      p_spare_parts_total_cost: input.spare_parts_total_cost ?? 0,
       p_products: productsJson,
     });
 
@@ -255,6 +256,7 @@ export async function updateJob(
       p_advance_paid_date: input.advance_paid_date || null,
       p_gst_enabled: input.gst_enabled || null,
       p_estimate_delivery_date: input.estimate_delivery_date || null,
+      p_spare_parts_total_cost: input.spare_parts_total_cost || null,
       p_user_id: userId,
       p_products: null, // Products handled separately in edit page
     });
