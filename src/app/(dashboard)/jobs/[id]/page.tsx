@@ -474,6 +474,12 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                         ))}
                       </div>
                     )}
+                    {job.spare_parts_total_cost > 0 && (
+                      <div className="flex justify-between text-xs text-gray-500">
+                        <span>Spare Parts Total Cost (Office Use)</span>
+                        <span>{formatINR(job.spare_parts_total_cost)}</span>
+                      </div>
+                    )}
                     {job.gst_enabled && (
                       <div className="flex justify-between">
                         <span className="text-gray-600">GST (18%)</span>
