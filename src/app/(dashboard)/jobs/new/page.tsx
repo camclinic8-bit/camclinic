@@ -13,6 +13,7 @@ import { Select } from '@/components/ui/Select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { ChipInput } from '@/components/ui/ChipInput';
 import { ProductWarrantyFields } from '@/components/jobs/ProductWarrantyFields';
+import { ProductImagesFields } from '@/components/jobs/ProductImagesFields';
 import { AccessoryCheckboxList } from '@/components/inventory/AccessoryCheckboxList';
 import { useCreateJob } from '@/hooks/useJobs';
 import { useSearchCustomers, useCreateCustomer } from '@/hooks/useCustomers';
@@ -40,6 +41,8 @@ const productSchema = z.object({
   warranty_expiry_date: optionalStr,
   repeat_job_number: optionalStr,
   other_job_number: optionalStr,
+  warranty_images: z.array(z.string()).optional().default([]),
+  product_images: z.array(z.string()).optional().default([]),
   accessories: chipStringArray,
   other_parts: chipStringArray,
 });
@@ -57,7 +60,15 @@ const jobSchema = z.object({
   advance_paid_date: optionalDateInput,
   estimate_delivery_date: optionalDateInput,
   spare_parts_total_cost: optionalNonNegativeNumber,
+  spare_parts_private_details: z.array(
+    z.object({
+      name: z.string(),
+      quantity: z.number(),
+      unit_cost: z.number(),
+    })
+  ).optional().default([]),
   products: z.array(productSchema).min(1, 'At least one product is required'),
+  alternative_contact: optionalStr,
 });
 
 type JobFormData = z.infer<typeof jobSchema>;
@@ -67,7 +78,7 @@ export default function NewJobPage() {
   const [customerSearch, setCustomerSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
-  const [newCustomerData, setNewCustomerData] = useState({ name: '', phone: '', email: '', address: '' });
+  const [newCustomerData, setNewCustomerData] = useState({ name: '', phone: '', email: '', address: '', alternative_contact: '' });
 
   const { data: searchResults } = useSearchCustomers(customerSearch);
   const { data: branches } = useBranches();
@@ -86,7 +97,10 @@ export default function NewJobPage() {
     resolver: zodResolver(jobSchema) as Resolver<JobFormData>,
     defaultValues: {
       priority: 'medium',
-      products: [{ has_warranty: false, accessories: [], other_parts: [] }],
+      alternative_contact: '',
+      spare_parts_total_cost: 0,
+      products: [{ has_warranty: false, accessories: [], other_parts: [], warranty_images: [], product_images: [] }],
+      spare_parts_private_details: [],
     },
   });
 
@@ -135,14 +149,16 @@ export default function NewJobPage() {
     }
     try {
       const customer = await createCustomer.mutateAsync({
-        ...newCustomerData,
         name,
         phone,
+        email: newCustomerData.email.trim() || null,
+        address: newCustomerData.address.trim() || null,
       });
       setSelectedCustomer(customer);
       setValue('customer_id', customer.id);
+      setValue('alternative_contact', newCustomerData.alternative_contact.trim());
       setShowNewCustomer(false);
-      setNewCustomerData({ name: '', phone: '', email: '', address: '' });
+      setNewCustomerData({ name: '', phone: '', email: '', address: '', alternative_contact: '' });
     } catch {
       // Error handled by mutation
     }
@@ -159,11 +175,13 @@ export default function NewJobPage() {
         advance_paid_date: data.advance_paid_date?.trim() || null,
         estimate_delivery_date: data.estimate_delivery_date?.trim() || null,
         spare_parts_total_cost: data.spare_parts_total_cost ?? 0,
+        spare_parts_private_details: data.spare_parts_private_details || [],
         products: data.products.map(p => ({
           ...p,
           condition: p.condition as ProductCondition || null,
           accessories: p.accessories || [],
           other_parts: p.other_parts || [],
+          warranty_images: p.warranty_images || [],
         })),
       };
 
@@ -190,29 +208,48 @@ export default function NewJobPage() {
             Back to Jobs
           </Button>
         </div>
-        <form onSubmit={handleSubmit(onSubmit)} className="max-w-4xl mx-auto space-y-6">
+        <form
+          onSubmit={handleSubmit(onSubmit, (errors) => {
+            console.error('Validation Errors:', errors);
+            const errFields = Object.keys(errors).join(', ');
+            toast.error(`Please fix validation errors on: ${errFields}`);
+          })}
+          className="max-w-4xl mx-auto space-y-6"
+        >
           <Card>
             <CardHeader>
               <CardTitle>Customer Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {selectedCustomer ? (
-                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                  <div>
-                    <p className="font-medium">{selectedCustomer.name}</p>
-                    <p className="text-sm text-gray-600">{selectedCustomer.phone}</p>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                    <div>
+                      <p className="font-medium">{selectedCustomer.name}</p>
+                      <p className="text-sm text-gray-600">{selectedCustomer.phone}</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedCustomer(null);
+                        setValue('customer_id', '');
+                      }}
+                    >
+                      Change
+                    </Button>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedCustomer(null);
-                      setValue('customer_id', '');
-                    }}
-                  >
-                    Change
-                  </Button>
+                  <div>
+                    <Input
+                      label="Alternative Contact (Optional)"
+                      placeholder="e.g. Backup Phone, Spouse or Office number"
+                      {...register('alternative_contact')}
+                    />
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      Used if we cannot reach the primary customer.
+                    </p>
+                  </div>
                 </div>
               ) : showNewCustomer ? (
                 <div className="space-y-3 p-4 border rounded-lg">
@@ -240,6 +277,12 @@ export default function NewJobPage() {
                     label="Address (optional)"
                     value={newCustomerData.address}
                     onChange={(e) => setNewCustomerData(d => ({ ...d, address: e.target.value }))}
+                  />
+                  <Input
+                    label="Alternative Contact (Optional)"
+                    value={newCustomerData.alternative_contact}
+                    onChange={(e) => setNewCustomerData(d => ({ ...d, alternative_contact: e.target.value }))}
+                    placeholder="e.g. Backup Phone, Spouse or Office number"
                   />
                   <div className="flex gap-2">
                     <Button
@@ -357,11 +400,6 @@ export default function NewJobPage() {
               </div>
               <div className="grid md:grid-cols-2 gap-4">
                 <Input
-                  type="number"
-                  label="Spare Parts Total Cost (₹) (Office Use Only)"
-                  {...register('spare_parts_total_cost', { valueAsNumber: true })}
-                />
-                <Input
                   type="date"
                   label="Advance Paid Date (optional)"
                   {...register('advance_paid_date')}
@@ -388,7 +426,7 @@ export default function NewJobPage() {
                 variant="outline"
                 size="sm"
                 onClick={() =>
-                  append({ has_warranty: false, accessories: [], other_parts: [] })
+                  append({ has_warranty: false, accessories: [], other_parts: [], warranty_images: [], product_images: [] })
                 }
               >
                 <Plus className="h-4 w-4 mr-1" />
@@ -493,6 +531,11 @@ export default function NewJobPage() {
                     control={control}
                     index={index}
                     register={register}
+                    setValue={setValue}
+                  />
+                  <ProductImagesFields
+                    control={control}
+                    index={index}
                     setValue={setValue}
                   />
                 </div>

@@ -72,26 +72,26 @@ export function Sidebar() {
       `}
       >
         <div className="flex flex-col h-full min-h-0">
-          {/* Mobile / drawer: full title */}
+          {/* Mobile / drawer: full logo */}
           <div className="border-b p-4 lg:hidden">
-            <h1 className="text-xl font-bold text-blue-600">CamClinic</h1>
-            <p className="text-xs text-gray-500 mt-1">Camera Service Management</p>
+            <span className="text-xl font-bold text-gray-900">CamClinic</span>
+            <p className="text-xs text-gray-500">Camera Service Management</p>
           </div>
 
           {/* Desktop: expanded header + collapse control */}
           <div
-            className={`border-b p-4 items-start justify-between gap-2 ${
+            className={`border-b p-4 items-center justify-between gap-2 ${
               sidebarCollapsed ? 'hidden' : 'hidden lg:flex'
             }`}
           >
             <div className="min-w-0">
-              <h1 className="text-xl font-bold text-blue-600">CamClinic</h1>
-              <p className="text-xs text-gray-500 mt-1">Camera Service Management</p>
+              <span className="text-xl font-bold text-gray-900">CamClinic</span>
+              <p className="text-xs text-gray-500">Camera Service Management</p>
             </div>
             <button
               type="button"
               onClick={toggleSidebarCollapsed}
-              className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               aria-label="Minimize sidebar"
               title="Minimize sidebar"
             >
@@ -99,14 +99,14 @@ export function Sidebar() {
             </button>
           </div>
 
-          {/* Desktop: collapsed — brand + expand */}
+          {/* Desktop: collapsed — logo icon + expand */}
           <div
             className={`border-b items-center gap-3 py-4 px-2 ${
               sidebarCollapsed ? 'hidden lg:flex lg:flex-col' : 'hidden'
             }`}
           >
-            <span className="text-xl font-bold text-blue-600" aria-hidden>
-              C
+            <span className="text-base font-bold text-blue-600 bg-blue-50 w-8 h-8 rounded-lg flex items-center justify-center border border-blue-200 select-none">
+              CC
             </span>
             <button
               type="button"

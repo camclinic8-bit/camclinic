@@ -4,10 +4,9 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Camera } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { useAuth } from '@/hooks/useAuth';
 
 const loginSchema = z.object({
@@ -42,11 +41,10 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-            <Camera className="h-6 w-6 text-blue-600" />
+          <div className="mx-auto mb-2 flex items-center justify-center">
+            <span className="text-3xl font-extrabold text-blue-600 tracking-tight">CamClinic</span>
           </div>
-          <CardTitle className="text-2xl">CamClinic</CardTitle>
-          <p className="text-sm text-gray-500 mt-1">Camera Service Management</p>
+          <p className="text-sm text-gray-500">Camera Service Management</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

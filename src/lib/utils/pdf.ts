@@ -13,19 +13,25 @@ function formatAmountRs(value: number): string {
   })}`;
 }
 
-function addHeader(doc: jsPDF, title: string): number {
-  doc.setFontSize(18);
-  doc.setFont('helvetica', 'bold');
-  doc.text(APP_NAME, 105, 20, { align: 'center' });
 
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text(title, 105, 31, { align: 'center' });
 
+/** Adds the page header: logo (left) + title (right) + horizontal rule */
+async function addHeader(doc: jsPDF, title: string): Promise<number> {
+  // Brand text on the left
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.text(APP_NAME, 14, 20);
+
+  // Title right-aligned
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.text(title, 196, 18, { align: 'right' });
+
+  // Horizontal rule
   doc.setLineWidth(0.5);
-  doc.line(14, 36, 196, 36);
+  doc.line(14, 31, 196, 31);
 
-  return 41;
+  return 37;
 }
 
 function addJobInfo(doc: jsPDF, job: JobWithRelations, startY: number): number {
@@ -174,7 +180,13 @@ function addChargesTable(doc: jsPDF, job: JobWithRelations, startY: number): num
 
   const spareParts = job.spare_parts || [];
   spareParts.forEach(part => {
-    chargesData.push([`${part.name} (${part.quantity} x ${formatAmountRs(part.unit_price)})`, formatAmountRs(part.total_price)]);
+    const hsnNote = (part as { hsn_code?: string | null }).hsn_code
+      ? ` [HSN: ${(part as { hsn_code?: string | null }).hsn_code}]`
+      : '';
+    chargesData.push([
+      `${part.name}${hsnNote} (${part.quantity} x ${formatAmountRs(part.unit_price)})`,
+      formatAmountRs(part.total_price),
+    ]);
   });
 
   if (job.gst_enabled && job.gst_amount > 0) {
@@ -245,10 +257,10 @@ function addTermsAndConditions(doc: jsPDF, terms: TermsAndConditions | null, sta
  * Generate a Receipt PDF for a job
  * Generated when job is created (status = New)
  */
-export function generateReceipt(job: JobWithRelations, terms?: TermsAndConditions | null): jsPDF {
+export async function generateReceipt(job: JobWithRelations, terms?: TermsAndConditions | null): Promise<jsPDF> {
   const doc = new jsPDF();
 
-  let y = addHeader(doc, 'SERVICE RECEIPT');
+  let y = await addHeader(doc, 'SERVICE RECEIPT');
   y = addJobInfo(doc, job, y);
   y = addCustomerInfo(doc, job, y);
   y = addProductsFullTable(doc, job, y);
@@ -284,10 +296,10 @@ export function generateReceipt(job: JobWithRelations, terms?: TermsAndCondition
  * Generate a Quote PDF for a job
  * Generated when charges are entered and status = Quote Sent
  */
-export function generateQuote(job: JobWithRelations, terms?: TermsAndConditions | null): jsPDF {
+export async function generateQuote(job: JobWithRelations, terms?: TermsAndConditions | null): Promise<jsPDF> {
   const doc = new jsPDF();
 
-  let y = addHeader(doc, 'SERVICE QUOTATION');
+  let y = await addHeader(doc, 'SERVICE QUOTATION');
   y = addJobInfo(doc, job, y);
   y = addCustomerInfo(doc, job, y);
   y = addProductsFullTable(doc, job, y);
@@ -316,10 +328,10 @@ export function generateQuote(job: JobWithRelations, terms?: TermsAndConditions 
  * Generate an Invoice PDF for a job
  * Generated when status = Completed
  */
-export function generateInvoice(job: JobWithRelations, terms?: TermsAndConditions | null): jsPDF {
+export async function generateInvoice(job: JobWithRelations, terms?: TermsAndConditions | null): Promise<jsPDF> {
   const doc = new jsPDF();
 
-  let y = addHeader(doc, 'SERVICE INVOICE');
+  let y = await addHeader(doc, 'SERVICE INVOICE');
   y = addJobInfo(doc, job, y);
   y = addCustomerInfo(doc, job, y);
   y = addProductsFullTable(doc, job, y);
