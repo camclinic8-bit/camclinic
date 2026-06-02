@@ -407,36 +407,39 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
       });
 
       const supabase = createClient();
-      await syncJobProducts(supabase, id, productsPayload);
+      
+      // Run both database updates in parallel to reduce save latency
+      await Promise.all([
+        syncJobProducts(supabase, id, productsPayload),
+        updateJob.mutateAsync({
+          id,
+          input: {
+            status: data.status,
+            priority: data.priority,
+            service_branch_id: data.service_branch_id,
+            delivery_branch_id: data.delivery_branch_id,
+            assigned_incharge_id: data.assigned_incharge_id || null,
+            assigned_technician_id: data.assigned_technician_id || null,
+            description: data.description || null,
+            technician_notes: data.technician_notes || null,
+            cam_clinic_advisory_notes: data.cam_clinic_advisory_notes || null,
+            inspection_fee: data.inspection_fee ?? 0,
+            service_charges: data.service_charges ?? 0,
+            advance_paid: data.advance_paid ?? 0,
+            advance_paid_date:
+              data.advance_paid && data.advance_paid > 0
+                ? data.advance_paid_date?.trim() || null
+                : null,
+            gst_enabled: data.gst_enabled,
+            estimate_delivery_date: data.estimate_delivery_date?.trim() || null,
+            spare_parts_total_cost: data.spare_parts_total_cost ?? 0,
+            spare_parts_private_details: data.spare_parts_private_details || [],
+          },
+        })
+      ]);
 
-      await updateJob.mutateAsync({
-        id,
-        input: {
-          status: data.status,
-          priority: data.priority,
-          service_branch_id: data.service_branch_id,
-          delivery_branch_id: data.delivery_branch_id,
-          assigned_incharge_id: data.assigned_incharge_id || null,
-          assigned_technician_id: data.assigned_technician_id || null,
-          description: data.description || null,
-          technician_notes: data.technician_notes || null,
-          cam_clinic_advisory_notes: data.cam_clinic_advisory_notes || null,
-          inspection_fee: data.inspection_fee ?? 0,
-          service_charges: data.service_charges ?? 0,
-          advance_paid: data.advance_paid ?? 0,
-          advance_paid_date:
-            data.advance_paid && data.advance_paid > 0
-              ? data.advance_paid_date?.trim() || null
-              : null,
-          gst_enabled: data.gst_enabled,
-          estimate_delivery_date: data.estimate_delivery_date?.trim() || null,
-          spare_parts_total_cost: data.spare_parts_total_cost ?? 0,
-          spare_parts_private_details: data.spare_parts_private_details || [],
-        },
-      });
-
-      // Ensure details page fetches the freshest nested product/chip data.
-      await queryClient.invalidateQueries({ queryKey: ['job', id] });
+      // Trigger cache invalidation in background without blocking instant UI navigation
+      queryClient.invalidateQueries({ queryKey: ['job', id] });
 
       // Replace edit entry in browser history to avoid back navigation loops.
       router.replace(`/jobs/${id}`);
