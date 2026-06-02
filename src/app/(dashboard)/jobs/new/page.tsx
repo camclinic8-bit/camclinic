@@ -65,6 +65,7 @@ const jobSchema = z.object({
       name: z.string(),
       quantity: z.number(),
       unit_cost: z.number(),
+      hsn_code: z.string().nullable().optional(),
     })
   ).optional().default([]),
   products: z.array(productSchema).min(1, 'At least one product is required'),
