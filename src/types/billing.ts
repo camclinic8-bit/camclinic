@@ -5,6 +5,7 @@ export interface SparePart {
   quantity: number;
   unit_price: number;
   total_price: number;
+  hsn_code?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -26,4 +27,5 @@ export interface SparePartInput {
   name: string;
   quantity: number;
   unit_price: number;
+  hsn_code?: string | null;
 }

@@ -31,6 +31,7 @@ export async function addSparePart(
       p_name: input.name,
       p_quantity: input.quantity,
       p_unit_price: input.unit_price,
+      p_hsn_code: input.hsn_code?.trim() || null,
     });
 
   if (error) throw error;
@@ -59,6 +60,7 @@ export async function updateSparePart(
       p_name: input.name,
       p_quantity: input.quantity,
       p_unit_price: input.unit_price,
+      p_hsn_code: input.hsn_code?.trim() || null,
     });
 
   if (error) throw error;

@@ -42,9 +42,29 @@ export function AccessoryCheckboxList({ value, onChange, label = 'Accessories' }
     );
   }
 
+  const allNames = accessories?.map((acc) => acc.name) || [];
+  const isAllSelected = allNames.length > 0 && allNames.every((name) => value.includes(name));
+
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      onChange([]);
+    } else {
+      onChange(allNames);
+    }
+  };
+
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-sm font-medium text-gray-700">{label}</label>
+        <button
+          type="button"
+          onClick={handleSelectAll}
+          className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 focus:outline-none transition-colors"
+        >
+          {isAllSelected ? 'Deselect All' : 'Select All'}
+        </button>
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
         {accessories.map((accessory) => (
           <label

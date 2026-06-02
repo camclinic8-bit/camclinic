@@ -14,7 +14,7 @@ export type JobStatus =
 
 export type JobPriority = 'immediate' | 'high' | 'medium' | 'low';
 
-export type ProductCondition = 'good' | 'dusty' | 'scratches' | 'damage' | 'not_working' | 'dead';
+export type ProductCondition = 'good' | 'dusty' | 'scratches' | 'damage' | 'liquid_damage' | 'not_working' | 'dead';
 
 export const JOB_STATUS_ORDER: JobStatus[] = [
   'new',
@@ -25,6 +25,7 @@ export const JOB_STATUS_ORDER: JobStatus[] = [
   'spare_parts_pending',
   'in_progress',
   'completed',
+  'cancelled',
 ];
 
 export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
@@ -52,6 +53,7 @@ export const PRODUCT_CONDITION_LABELS: Record<ProductCondition, string> = {
   dusty: 'Dusty',
   scratches: 'Scratches',
   damage: 'Damage',
+  liquid_damage: 'Liquid Damage',
   not_working: 'Not Working',
   dead: 'Dead',
 };

@@ -43,6 +43,8 @@ export interface JobProduct {
   warranty_expiry_date: string | null;
   repeat_job_number: string | null;
   other_job_number: string | null;
+  warranty_images?: string[];
+  product_images?: string[];
   created_at: string;
   updated_at: string;
   accessories?: ProductAccessory[];
@@ -87,9 +89,11 @@ export interface Job {
   grand_total: number;
   balance_amount: number;
   spare_parts_total_cost: number;
+  spare_parts_private_details?: any[] | null;
   estimate_delivery_date: string | null;
   service_date: string | null;
   created_by: string;
+  alternative_contact: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -139,6 +143,8 @@ export interface JobCreateInput {
   advance_paid_date?: string | null;
   estimate_delivery_date?: string | null;
   spare_parts_total_cost?: number;
+  alternative_contact?: string | null;
+  spare_parts_private_details?: any[] | null;
   products: JobProductInput[];
 }
 
@@ -154,6 +160,8 @@ export interface JobProductInput {
   warranty_expiry_date?: string | null;
   repeat_job_number?: string | null;
   other_job_number?: string | null;
+  warranty_images?: string[];
+  product_images?: string[];
   accessories?: string[];
   other_parts?: string[];
 }
@@ -175,6 +183,8 @@ export interface JobUpdateInput {
   gst_enabled?: boolean;
   estimate_delivery_date?: string | null;
   spare_parts_total_cost?: number;
+  spare_parts_private_details?: any[] | null;
+  alternative_contact?: string | null;
 }
 
 export interface JobFilters {
