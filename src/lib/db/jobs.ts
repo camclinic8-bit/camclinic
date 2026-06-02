@@ -149,10 +149,12 @@ export async function getJobById(
         warranty_expiry_date,
         repeat_job_number,
         other_job_number,
+        warranty_images,
+        product_images,
         accessories:product_accessories(id, job_product_id, name),
         other_parts:product_other_parts(id, job_product_id, name)
       ),
-      spare_parts(id, job_id, name, quantity, unit_price, total_price),
+      spare_parts(id, job_id, name, quantity, unit_price, total_price, hsn_code),
       status_history:job_status_history(
         id,
         job_id,
@@ -212,6 +214,8 @@ export async function createJob(
     warranty_expiry_date: p.warranty_expiry_date,
     repeat_job_number: p.repeat_job_number,
     other_job_number: p.other_job_number,
+    warranty_images: p.warranty_images || [],
+    product_images: p.product_images || [],
     accessories: p.accessories || [],
     other_parts: p.other_parts || [],
   }));
@@ -234,7 +238,9 @@ export async function createJob(
         : null,
       p_estimate_delivery_date: input.estimate_delivery_date?.trim() || null,
       p_spare_parts_total_cost: input.spare_parts_total_cost ?? 0,
+      p_spare_parts_private_details: input.spare_parts_private_details || [],
       p_products: productsJson,
+      p_alternative_contact: input.alternative_contact?.trim() || null,
     });
 
   if (error) throw error;
@@ -279,8 +285,10 @@ export async function updateJob(
       p_gst_enabled: input.gst_enabled ?? null,
       p_estimate_delivery_date: input.estimate_delivery_date ?? null,
       p_spare_parts_total_cost: input.spare_parts_total_cost ?? null,
+      p_spare_parts_private_details: input.spare_parts_private_details ?? null,
       p_user_id: userId,
       p_products: null, // Products handled separately in edit page
+      p_alternative_contact: input.alternative_contact?.trim() || null,
     });
 
   if (error) throw error;
