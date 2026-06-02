@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Clock,
+  Lock,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
@@ -51,6 +52,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [showPaymentInput, setShowPaymentInput] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [terms, setTerms] = useState<any>(null);
+  const [activeImage, setActiveImage] = useState<string | null>(null);
 
   // Fetch active terms and conditions (global)
   useEffect(() => {
@@ -139,21 +141,21 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const handleDownloadReceipt = async () => {
     if (!job) return;
     const { generateReceipt, downloadPDF } = await import('@/lib/utils/pdf');
-    const doc = generateReceipt(job, terms);
+    const doc = await generateReceipt(job, terms);
     downloadPDF(doc, `receipt-${job.job_number}.pdf`);
   };
 
   const handleDownloadQuote = async () => {
     if (!job) return;
     const { generateQuote, downloadPDF } = await import('@/lib/utils/pdf');
-    const doc = generateQuote(job, terms);
+    const doc = await generateQuote(job, terms);
     downloadPDF(doc, `quote-${job.job_number}.pdf`);
   };
 
   const handleDownloadInvoice = async () => {
     if (!job) return;
     const { generateInvoice, downloadPDF } = await import('@/lib/utils/pdf');
-    const doc = generateInvoice(job, terms);
+    const doc = await generateInvoice(job, terms);
     downloadPDF(doc, `invoice-${job.job_number}.pdf`);
   };
 
@@ -239,6 +241,12 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                         <Phone className="h-4 w-4" />
                         {job.customer?.phone}
                       </div>
+                      {job.alternative_contact && (
+                        <div className="flex items-center gap-2 text-sm text-emerald-600 font-medium mt-1">
+                          <Phone className="h-4 w-4" />
+                          Alt Contact: {job.alternative_contact}
+                        </div>
+                      )}
                       {job.customer?.address && (
                         <p className="text-sm text-gray-500 mt-1">{job.customer.address}</p>
                       )}
@@ -351,16 +359,72 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                           )}
                         </div>
 
-                        {product.has_warranty && (
-                          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md text-sm">
-                            <p className="font-medium text-yellow-900">Warranty Details</p>
-                            <p className="text-yellow-800 mt-1">
-                              {product.warranty_description || 'Warranty marked, description not provided'}
+                        {/* Product Photos Grid */}
+                        {product.product_images && product.product_images.length > 0 && (
+                          <div className="pt-2">
+                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                              Product Photos ({product.product_images.length})
                             </p>
-                            {product.warranty_expiry_date && (
-                              <p className={`mt-1 ${isExpired(product.warranty_expiry_date) ? 'text-red-600' : 'text-yellow-900'}`}>
-                                Expires: {formatDate(product.warranty_expiry_date)}
+                            <div className="flex flex-wrap gap-2.5">
+                              {product.product_images.map((imgUrl, imgIdx) => (
+                                <button
+                                  key={imgIdx}
+                                  type="button"
+                                  onClick={() => setActiveImage(imgUrl)}
+                                  className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200 hover:border-emerald-500 shadow-sm transition-transform hover:scale-105 active:scale-95 group focus:outline-none cursor-zoom-in"
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={imgUrl}
+                                    alt={`Product photo ${imgIdx + 1}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                  <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" />
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {product.has_warranty && (
+                          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md text-sm space-y-3">
+                            <div>
+                              <p className="font-medium text-yellow-900">Warranty Details</p>
+                              <p className="text-yellow-800 mt-1">
+                                {product.warranty_description || 'Warranty marked, description not provided'}
                               </p>
+                              {product.warranty_expiry_date && (
+                                <p className={`mt-1 ${isExpired(product.warranty_expiry_date) ? 'text-red-600' : 'text-yellow-900'}`}>
+                                  Expires: {formatDate(product.warranty_expiry_date)}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Warranty Images Grid */}
+                            {product.warranty_images && product.warranty_images.length > 0 && (
+                              <div className="pt-2 border-t border-yellow-250">
+                                <p className="text-xs font-semibold text-yellow-850 uppercase tracking-wider mb-2">
+                                  Warranty Photos ({product.warranty_images.length})
+                                </p>
+                                <div className="flex flex-wrap gap-2.5">
+                                  {product.warranty_images.map((imgUrl, imgIdx) => (
+                                    <button
+                                      key={imgIdx}
+                                      type="button"
+                                      onClick={() => setActiveImage(imgUrl)}
+                                      className="relative w-16 h-16 rounded-lg overflow-hidden border border-yellow-200 hover:border-yellow-500 shadow-sm transition-transform hover:scale-105 active:scale-95 group focus:outline-none cursor-zoom-in"
+                                    >
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img
+                                        src={imgUrl}
+                                        alt={`Warranty photo ${imgIdx + 1}`}
+                                        className="w-full h-full object-cover"
+                                      />
+                                      <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" />
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
                             )}
                           </div>
                         )}
@@ -371,6 +435,49 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   )}
                 </CardContent>
               </Card>
+
+              {job.spare_parts_private_details && job.spare_parts_private_details.length > 0 && (
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                    <CardTitle className="flex items-center gap-1.5">
+                      <Lock className="w-4 h-4 text-gray-500" />
+                      Internal Cost Registry (Office Use Only)
+                    </CardTitle>
+                    <Badge variant="gray">
+                      Cost Sum: {formatINR(job.spare_parts_total_cost)}
+                    </Badge>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b text-left text-gray-500">
+                            <th className="px-3 py-2">Part / Item Name</th>
+                            <th className="px-3 py-2 w-28">HSN Code</th>
+                            <th className="px-3 py-2 w-20 text-center">Qty</th>
+                            <th className="px-3 py-2 w-28 text-right">Unit Cost</th>
+                            <th className="px-3 py-2 w-28 text-right">Total Cost</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {job.spare_parts_private_details.map((part: any, idx: number) => (
+                            <tr key={idx}>
+                              <td className="px-3 py-2 font-medium">{part.name}</td>
+                              <td className="px-3 py-2 text-gray-500">{part.hsn_code || <span className="text-gray-300">—</span>}</td>
+                              <td className="px-3 py-2 text-center">{part.quantity}</td>
+                              <td className="px-3 py-2 text-right">{formatINR(part.unit_cost)}</td>
+                              <td className="px-3 py-2 text-right font-semibold">
+                                {formatINR(part.quantity * part.unit_cost)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {job.description && (
                 <Card>
@@ -510,12 +617,17 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                         <p className="text-gray-600 mb-1">Parts Used:</p>
                         {job.spare_parts.map((part) => (
                           <div key={part.id} className="flex justify-between text-xs">
-                            <span>{part.name} ×{part.quantity}</span>
+                            <span>
+                              {part.name}
+                              {part.hsn_code && <span className="text-gray-400 ml-1">[{part.hsn_code}]</span>}
+                              {' '}×{part.quantity}
+                            </span>
                             <span>{formatINR(part.total_price)}</span>
                           </div>
                         ))}
                       </div>
                     )}
+
                     {job.spare_parts_total_cost > 0 && (
                       <div className="flex justify-between text-xs text-gray-500">
                         <span>Spare Parts Total Cost (Office Use)</span>
@@ -691,6 +803,33 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           </div>
         </div>
       </div>
+      {activeImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm transition-opacity duration-300"
+          onClick={() => setActiveImage(null)}
+        >
+          <button
+            onClick={() => setActiveImage(null)}
+            className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-transform hover:scale-105 focus:outline-none"
+            aria-label="Close preview"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <div
+            className="relative max-w-4xl max-h-[85vh] p-2 bg-white/5 rounded-2xl border border-white/10 shadow-2xl transition-all duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={activeImage}
+              alt="Warranty preview zoomed"
+              className="max-w-full max-h-[80vh] rounded-xl object-contain shadow-2xl"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

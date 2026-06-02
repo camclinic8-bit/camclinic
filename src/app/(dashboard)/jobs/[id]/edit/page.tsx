@@ -14,7 +14,9 @@ import { Select } from '@/components/ui/Select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { ChipInput } from '@/components/ui/ChipInput';
 import { ProductWarrantyFields } from '@/components/jobs/ProductWarrantyFields';
+import { ProductImagesFields } from '@/components/jobs/ProductImagesFields';
 import { AccessoryCheckboxList } from '@/components/inventory/AccessoryCheckboxList';
+import { PrivateSparePartsRegistry } from '@/components/jobs/PrivateSparePartsRegistry';
 import { useJob, useUpdateJob } from '@/hooks/useJobs';
 import { useBranches } from '@/hooks/useBranches';
 import { useTechnicians, useServiceIncharges } from '@/hooks/useTechnicians';
@@ -58,6 +60,8 @@ const productSchema = z.object({
   warranty_expiry_date: optionalStr,
   repeat_job_number: optionalStr,
   other_job_number: optionalStr,
+  warranty_images: z.array(z.string()).optional().default([]),
+  product_images: z.array(z.string()).optional().default([]),
   accessories: chipStringArray,
   other_parts: chipStringArray,
 });
@@ -91,7 +95,16 @@ const editJobSchema = z.object({
   gst_enabled: z.boolean(),
   estimate_delivery_date: optionalDateInput,
   spare_parts_total_cost: nonNegativeNumberOrZero,
+  spare_parts_private_details: z.array(
+    z.object({
+      name: z.string(),
+      quantity: z.number(),
+      unit_cost: z.number(),
+      hsn_code: z.string().nullable().optional(),
+    })
+  ).optional().default([]),
   products: z.array(productSchema).min(1, 'At least one product is required'),
+  alternative_contact: optionalStr,
 });
 
 type EditJobFormData = z.infer<typeof editJobSchema>;
@@ -104,14 +117,16 @@ interface AddPartRowProps {
 
 const AddPartRow = memo(function AddPartRow({ jobId }: AddPartRowProps) {
   const [name, setName] = useState('');
+  const [hsn, setHsn] = useState('');
   const [qty, setQty] = useState(1);
   const [price, setPrice] = useState(0);
   const addSparePart = useAddSparePart(jobId);
 
   const handleAdd = async () => {
     if (!name.trim()) return;
-    await addSparePart.mutateAsync({ name: name.trim(), quantity: qty, unit_price: price });
+    await addSparePart.mutateAsync({ name: name.trim(), quantity: qty, unit_price: price, hsn_code: hsn.trim() || null });
     setName('');
+    setHsn('');
     setQty(1);
     setPrice(0);
   };
@@ -124,6 +139,16 @@ const AddPartRow = memo(function AddPartRow({ jobId }: AddPartRowProps) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Part / item name"
+          className="w-full border rounded px-2 py-1 text-sm"
+          onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+        />
+      </td>
+      <td className="px-3 py-2 w-28">
+        <input
+          type="text"
+          value={hsn}
+          onChange={(e) => setHsn(e.target.value)}
+          placeholder="HSN (optional)"
           className="w-full border rounded px-2 py-1 text-sm"
           onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
         />
@@ -190,6 +215,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
     phone: '',
     email: '',
     address: '',
+    alternative_contact: '',
   });
   const { data: searchResults } = useSearchCustomers(customerSearch);
   const createCustomer = useCreateCustomer();
@@ -207,6 +233,8 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
     defaultValues: {
       gst_enabled: false,
       products: [{ has_warranty: false, accessories: [], other_parts: [] }],
+      spare_parts_private_details: [],
+      alternative_contact: '',
     },
   });
 
@@ -240,6 +268,8 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
         gst_enabled: job.gst_enabled,
         estimate_delivery_date: job.estimate_delivery_date || '',
         spare_parts_total_cost: job.spare_parts_total_cost || 0,
+        spare_parts_private_details: job.spare_parts_private_details || [],
+        alternative_contact: job.alternative_contact || '',
         products: (job.products || []).map((p) => ({
           id: p.id,
           brand: p.brand || '',
@@ -253,6 +283,8 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
           warranty_expiry_date: p.warranty_expiry_date || '',
           repeat_job_number: p.repeat_job_number || '',
           other_job_number: p.other_job_number || '',
+          warranty_images: p.warranty_images || [],
+          product_images: p.product_images || [],
           accessories: (p.accessories || [])
             .map((a) => a.name)
             .filter((n): n is string => typeof n === 'string' && n.trim().length > 0),
@@ -310,15 +342,17 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
     }
     try {
       const customer = await createCustomer.mutateAsync({
-        ...newCustomerData,
         name,
         phone,
+        email: newCustomerData.email.trim() || null,
+        address: newCustomerData.address.trim() || null,
       });
       setSelectedCustomer(customer);
       setValue('customer_id', customer.id);
+      setValue('alternative_contact', newCustomerData.alternative_contact.trim());
       setShowNewCustomer(false);
       setShowChangeCustomer(false);
-      setNewCustomerData({ name: '', phone: '', email: '', address: '' });
+      setNewCustomerData({ name: '', phone: '', email: '', address: '', alternative_contact: '' });
     } catch {
       // handled by mutation
     }
@@ -365,41 +399,47 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
           warranty_expiry_date: w.warranty_expiry_date,
           repeat_job_number: toNull(product.repeat_job_number),
           other_job_number: toNull(product.other_job_number),
+          warranty_images: product.warranty_images || [],
+          product_images: product.product_images || [],
           accessories: (product.accessories || []).map((name) => name.trim()).filter(Boolean),
           other_parts: (product.other_parts || []).map((name) => name.trim()).filter(Boolean),
         };
       });
 
       const supabase = createClient();
-      await syncJobProducts(supabase, id, productsPayload);
+      
+      // Run both database updates in parallel to reduce save latency
+      await Promise.all([
+        syncJobProducts(supabase, id, productsPayload),
+        updateJob.mutateAsync({
+          id,
+          input: {
+            status: data.status,
+            priority: data.priority,
+            service_branch_id: data.service_branch_id,
+            delivery_branch_id: data.delivery_branch_id,
+            assigned_incharge_id: data.assigned_incharge_id || null,
+            assigned_technician_id: data.assigned_technician_id || null,
+            description: data.description || null,
+            technician_notes: data.technician_notes || null,
+            cam_clinic_advisory_notes: data.cam_clinic_advisory_notes || null,
+            inspection_fee: data.inspection_fee ?? 0,
+            service_charges: data.service_charges ?? 0,
+            advance_paid: data.advance_paid ?? 0,
+            advance_paid_date:
+              data.advance_paid && data.advance_paid > 0
+                ? data.advance_paid_date?.trim() || null
+                : null,
+            gst_enabled: data.gst_enabled,
+            estimate_delivery_date: data.estimate_delivery_date?.trim() || null,
+            spare_parts_total_cost: data.spare_parts_total_cost ?? 0,
+            spare_parts_private_details: data.spare_parts_private_details || [],
+          },
+        })
+      ]);
 
-      await updateJob.mutateAsync({
-        id,
-        input: {
-          status: data.status,
-          priority: data.priority,
-          service_branch_id: data.service_branch_id,
-          delivery_branch_id: data.delivery_branch_id,
-          assigned_incharge_id: data.assigned_incharge_id || null,
-          assigned_technician_id: data.assigned_technician_id || null,
-          description: data.description || null,
-          technician_notes: data.technician_notes || null,
-          cam_clinic_advisory_notes: data.cam_clinic_advisory_notes || null,
-          inspection_fee: data.inspection_fee ?? 0,
-          service_charges: data.service_charges ?? 0,
-          advance_paid: data.advance_paid ?? 0,
-          advance_paid_date:
-            data.advance_paid && data.advance_paid > 0
-              ? data.advance_paid_date?.trim() || null
-              : null,
-          gst_enabled: data.gst_enabled,
-          estimate_delivery_date: data.estimate_delivery_date?.trim() || null,
-          spare_parts_total_cost: data.spare_parts_total_cost ?? 0,
-        },
-      });
-
-      // Ensure details page fetches the freshest nested product/chip data.
-      await queryClient.invalidateQueries({ queryKey: ['job', id] });
+      // Trigger cache invalidation in background without blocking instant UI navigation
+      queryClient.invalidateQueries({ queryKey: ['job', id] });
 
       // Replace edit entry in browser history to avoid back navigation loops.
       router.replace(`/jobs/${id}`);
@@ -447,7 +487,14 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
       <Header title="Edit Job" />
 
       <div className="flex-1 p-4 lg:p-6 overflow-y-auto">
-        <form onSubmit={handleSubmit(onSubmit)} className="max-w-4xl mx-auto space-y-6">
+        <form
+          onSubmit={handleSubmit(onSubmit, (errors) => {
+            console.error('Validation Errors:', errors);
+            const errFields = Object.keys(errors).join(', ');
+            toast.error(`Please fix validation errors on: ${errFields}`);
+          })}
+          className="max-w-4xl mx-auto space-y-6"
+        >
 
           {/* Back + job number */}
           <div className="flex items-center gap-4">
@@ -465,27 +512,39 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
             <CardContent className="space-y-4">
               <input type="hidden" {...register('customer_id')} />
               {selectedCustomer && !showChangeCustomer ? (
-                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 rounded-full">
-                      <User className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium">{selectedCustomer.name}</p>
-                      <div className="flex items-center gap-1 text-sm text-gray-600">
-                        <Phone className="h-3 w-3" />
-                        {selectedCustomer.phone}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-100 rounded-full">
+                        <User className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{selectedCustomer.name}</p>
+                        <div className="flex items-center gap-1 text-sm text-gray-600">
+                          <Phone className="h-3 w-3" />
+                          {selectedCustomer.phone}
+                        </div>
                       </div>
                     </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowChangeCustomer(true)}
+                    >
+                      Change
+                    </Button>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowChangeCustomer(true)}
-                  >
-                    Change
-                  </Button>
+                  <div>
+                    <Input
+                      label="Alternative Contact (Optional)"
+                      placeholder="e.g. Backup Phone, Spouse or Office number"
+                      {...register('alternative_contact')}
+                    />
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      Used if we cannot reach the primary customer.
+                    </p>
+                  </div>
                 </div>
               ) : showNewCustomer ? (
                 <div className="space-y-3 p-4 border rounded-lg">
@@ -521,6 +580,14 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                     onChange={(e) =>
                       setNewCustomerData((d) => ({ ...d, address: e.target.value }))
                     }
+                  />
+                  <Input
+                    label="Alternative Contact (Optional)"
+                    value={newCustomerData.alternative_contact}
+                    onChange={(e) =>
+                      setNewCustomerData((d) => ({ ...d, alternative_contact: e.target.value }))
+                    }
+                    placeholder="e.g. Backup Phone, Spouse or Office number"
                   />
                   <div className="flex gap-2">
                     <Button
@@ -670,12 +737,9 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                   {...register('advance_paid_date')}
                 />
               </div>
-              <div>
-                <Input
-                  type="number"
-                  label="Spare Parts Total Cost (₹) (Office Use Only)"
-                  {...register('spare_parts_total_cost', { valueAsNumber: true })}
-                />
+              <div className="space-y-1">
+                <input type="hidden" {...register('spare_parts_total_cost')} />
+                <PrivateSparePartsRegistry control={control} setValue={setValue} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -704,6 +768,8 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                     has_warranty: false,
                     accessories: [],
                     other_parts: [],
+                    warranty_images: [],
+                    product_images: [],
                   })
                 }
               >
@@ -805,6 +871,11 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                     register={register}
                     setValue={setValue}
                   />
+                  <ProductImagesFields
+                    control={control}
+                    index={index}
+                    setValue={setValue}
+                  />
                 </div>
               ))}
               {errors.products && (
@@ -824,6 +895,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                   <thead>
                     <tr className="border-b text-left text-gray-500">
                       <th className="px-3 py-2">Name</th>
+                      <th className="px-3 py-2 w-28">HSN Code</th>
                       <th className="px-3 py-2 w-20">Qty</th>
                       <th className="px-3 py-2 w-28">Unit Price (₹)</th>
                       <th className="px-3 py-2 w-28">Total</th>
@@ -834,6 +906,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                     {spareParts.map((part) => (
                       <tr key={part.id}>
                         <td className="px-3 py-2">{part.name}</td>
+                        <td className="px-3 py-2 text-gray-500">{part.hsn_code || <span className="text-gray-300">—</span>}</td>
                         <td className="px-3 py-2">{part.quantity}</td>
                         <td className="px-3 py-2">{formatINR(part.unit_price)}</td>
                         <td className="px-3 py-2 font-medium">{formatINR(part.total_price)}</td>
@@ -850,6 +923,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                         </td>
                       </tr>
                     ))}
+
                     <AddPartRow jobId={id} />
                   </tbody>
                 </table>
