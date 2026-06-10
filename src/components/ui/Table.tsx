@@ -5,11 +5,12 @@ import { ReactNode } from 'react';
 interface TableProps {
   children: ReactNode;
   className?: string;
+  containerClassName?: string;
 }
 
-export function Table({ children, className = '' }: TableProps) {
+export function Table({ children, className = '', containerClassName = 'overflow-x-auto' }: TableProps) {
   return (
-    <div className="overflow-x-auto">
+    <div className={containerClassName}>
       <table className={`min-w-full divide-y divide-gray-200 ${className}`}>
         {children}
       </table>

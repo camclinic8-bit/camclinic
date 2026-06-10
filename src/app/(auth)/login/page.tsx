@@ -42,7 +42,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-2 flex items-center justify-center">
-            <span className="text-3xl font-extrabold text-blue-600 tracking-tight">CamClinic</span>
+            <img src="/logo.svg" alt="CamClinic" className="h-12 w-auto" />
           </div>
           <p className="text-sm text-gray-500">Camera Service Management</p>
         </CardHeader>
