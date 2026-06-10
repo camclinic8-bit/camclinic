@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   getJobs, 
   getJobById, 
@@ -19,7 +19,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
 import { isAppError } from '@/lib/errors';
 
-export function useJobs(filters?: JobFilters, page = 1, pageSize = 20) {
+export function useJobs(filters?: JobFilters, pageSize = 20) {
   const supabase = createClient();
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -29,10 +29,17 @@ export function useJobs(filters?: JobFilters, page = 1, pageSize = 20) {
     ? { ...filters, technician_id: user.id }
     : filters;
 
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: queryKeys.jobs.list(actualFilters),
-    queryFn: () => getJobs(supabase, actualFilters, page, pageSize),
-    placeholderData: (previousData) => previousData,
+    queryFn: ({ pageParam = 1 }) => getJobs(supabase, actualFilters, pageParam, pageSize),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages, lastPageParam) => {
+      const totalLoaded = allPages.reduce((sum, page) => sum + page.data.length, 0);
+      if (totalLoaded < lastPage.count) {
+        return lastPageParam + 1;
+      }
+      return undefined;
+    },
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     enabled: isAuthenticated,

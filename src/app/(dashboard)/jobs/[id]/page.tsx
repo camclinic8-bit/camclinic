@@ -141,21 +141,21 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const handleDownloadReceipt = async () => {
     if (!job) return;
     const { generateReceipt, downloadPDF } = await import('@/lib/utils/pdf');
-    const doc = await generateReceipt(job, terms);
+    const doc = await generateReceipt(job, job.service_branch, terms);
     downloadPDF(doc, `receipt-${job.job_number}.pdf`);
   };
 
   const handleDownloadQuote = async () => {
     if (!job) return;
     const { generateQuote, downloadPDF } = await import('@/lib/utils/pdf');
-    const doc = await generateQuote(job, terms);
+    const doc = await generateQuote(job, job.service_branch, terms);
     downloadPDF(doc, `quote-${job.job_number}.pdf`);
   };
 
   const handleDownloadInvoice = async () => {
     if (!job) return;
     const { generateInvoice, downloadPDF } = await import('@/lib/utils/pdf');
-    const doc = await generateInvoice(job, terms);
+    const doc = await generateInvoice(job, job.service_branch, terms);
     downloadPDF(doc, `invoice-${job.job_number}.pdf`);
   };
 

@@ -59,7 +59,7 @@ export function useCreateBranch() {
   const user = useAuthStore((state) => state.user);
 
   return useMutation({
-    mutationFn: (input: { name: string; address?: string | null; phone?: string | null }) => {
+    mutationFn: (input: { name: string; address?: string | null; phone?: string | null; email?: string | null; landline?: string | null }) => {
       if (!user?.shop_id) {
         throw new Error('User not authenticated');
       }
@@ -81,7 +81,7 @@ export function useUpdateBranch() {
   const supabase = createClient();
 
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: { name?: string; address?: string | null; phone?: string | null; is_active?: boolean } }) => {
+    mutationFn: ({ id, input }: { id: string; input: { name?: string; address?: string | null; phone?: string | null; email?: string | null; landline?: string | null; is_active?: boolean } }) => {
       return updateBranch(supabase, id, input);
     },
     onSuccess: (_, variables) => {

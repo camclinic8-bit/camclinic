@@ -74,8 +74,8 @@ export function Sidebar() {
         <div className="flex flex-col h-full min-h-0">
           {/* Mobile / drawer: full logo */}
           <div className="border-b p-4 lg:hidden">
-            <span className="text-xl font-bold text-gray-900">CamClinic</span>
-            <p className="text-xs text-gray-500">Camera Service Management</p>
+            <img src="/logo.svg" alt="CamClinic" className="h-10 w-auto" />
+            <p className="text-xs text-gray-500 mt-1">Camera Service Management</p>
           </div>
 
           {/* Desktop: expanded header + collapse control */}
@@ -85,8 +85,8 @@ export function Sidebar() {
             }`}
           >
             <div className="min-w-0">
-              <span className="text-xl font-bold text-gray-900">CamClinic</span>
-              <p className="text-xs text-gray-500">Camera Service Management</p>
+              <img src="/logo.svg" alt="CamClinic" className="h-10 w-auto" />
+              <p className="text-xs text-gray-500 mt-1">Camera Service Management</p>
             </div>
             <button
               type="button"
@@ -105,9 +105,7 @@ export function Sidebar() {
               sidebarCollapsed ? 'hidden lg:flex lg:flex-col' : 'hidden'
             }`}
           >
-            <span className="text-base font-bold text-blue-600 bg-blue-50 w-8 h-8 rounded-lg flex items-center justify-center border border-blue-200 select-none">
-              CC
-            </span>
+            <img src="/logo.svg" alt="CC" className="h-8 w-8" />
             <button
               type="button"
               onClick={toggleSidebarCollapsed}
