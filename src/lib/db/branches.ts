@@ -55,6 +55,8 @@ export async function createBranch(
     name: string;
     address?: string | null;
     phone?: string | null;
+    email?: string | null;
+    landline?: string | null;
   },
   shopId: string
 ): Promise<Branch> {
@@ -65,6 +67,8 @@ export async function createBranch(
       name: input.name,
       address: input.address,
       phone: input.phone,
+      email: input.email,
+      landline: input.landline,
     })
     .select()
     .single();
@@ -81,6 +85,8 @@ export async function updateBranch(
     name?: string;
     address?: string | null;
     phone?: string | null;
+    email?: string | null;
+    landline?: string | null;
     is_active?: boolean;
   }
 ): Promise<Branch> {

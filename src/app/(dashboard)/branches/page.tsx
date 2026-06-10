@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Building2, Phone, MapPin, Edit, Trash2 } from 'lucide-react';
+import { Plus, Building2, Phone, MapPin, Edit, Trash2, Mail } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -14,7 +14,7 @@ import { Branch } from '@/types/branch';
 export default function BranchesPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
-  const [formData, setFormData] = useState({ name: '', address: '', phone: '' });
+  const [formData, setFormData] = useState({ name: '', address: '', phone: '', email: '', landline: '' });
 
   const { data: branches, isLoading } = useAllBranches();
   const createBranch = useCreateBranch();
@@ -28,10 +28,12 @@ export default function BranchesPage() {
         name: branch.name,
         address: branch.address || '',
         phone: branch.phone || '',
+        email: branch.email || '',
+        landline: branch.landline || '',
       });
     } else {
       setEditingBranch(null);
-      setFormData({ name: '', address: '', phone: '' });
+      setFormData({ name: '', address: '', phone: '', email: '', landline: '' });
     }
     setShowModal(true);
   };
@@ -39,7 +41,7 @@ export default function BranchesPage() {
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingBranch(null);
-    setFormData({ name: '', address: '', phone: '' });
+    setFormData({ name: '', address: '', phone: '', email: '', landline: '' });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -130,6 +132,18 @@ export default function BranchesPage() {
                         {branch.phone}
                       </div>
                     )}
+                    {branch.landline && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4" />
+                        {branch.landline}
+                      </div>
+                    )}
+                    {branch.email && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4" />
+                        {branch.email}
+                      </div>
+                    )}
                     {branch.address && (
                       <div className="flex items-center gap-2">
                         <MapPin className="h-4 w-4" />
@@ -170,6 +184,17 @@ export default function BranchesPage() {
             label="Phone"
             value={formData.phone}
             onChange={(e) => setFormData(d => ({ ...d, phone: e.target.value }))}
+          />
+          <Input
+            label="Landline"
+            value={formData.landline}
+            onChange={(e) => setFormData(d => ({ ...d, landline: e.target.value }))}
+          />
+          <Input
+            label="Email"
+            type="email"
+            value={formData.email}
+            onChange={(e) => setFormData(d => ({ ...d, email: e.target.value }))}
           />
           <Input
             label="Address"
