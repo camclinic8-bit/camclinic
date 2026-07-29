@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { handleSupabaseError } from '@/lib/errors';
 import { normalizeJobProductWarrantyForDb } from '@/lib/utils/normalizeJobProduct';
 import { getLocalToday } from '@/lib/utils/dates';
 import { 
@@ -243,7 +244,7 @@ export async function createJob(
       p_alternative_contact: input.alternative_contact?.trim() || null,
     });
 
-  if (error) throw error;
+  if (error) throw handleSupabaseError(error);
 
   // Fetch the complete job with relations
   const { data: job, error: fetchError } = await supabase

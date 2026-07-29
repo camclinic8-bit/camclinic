@@ -112,22 +112,32 @@ export function handleSupabaseError(error: unknown): AppError {
     return error;
   }
 
-  if (error instanceof Error) {
-    const message = error.message.toLowerCase();
+  const errorMessage =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'object' &&
+          error !== null &&
+          'message' in error &&
+          typeof error.message === 'string'
+        ? error.message
+        : null;
+
+  if (errorMessage) {
+    const message = errorMessage.toLowerCase();
     
     // Authentication errors
     if (message.includes('jwt') || message.includes('auth')) {
-      return new UnauthorizedError(error.message, error);
+      return new UnauthorizedError(errorMessage, error);
     }
     
     // Not found errors
     if (message.includes('not found') || message.includes('no rows')) {
-      return new NotFoundError(error.message, error);
+      return new NotFoundError(errorMessage, error);
     }
     
     // Constraint violations
     if (message.includes('constraint') || message.includes('duplicate') || message.includes('unique')) {
-      return new ValidationError('Data violates database constraints', error);
+      return new ValidationError(errorMessage, error);
     }
     
     // Network errors
@@ -136,7 +146,7 @@ export function handleSupabaseError(error: unknown): AppError {
     }
     
     // Default to database error
-    return new DatabaseError(error.message, error);
+    return new DatabaseError(errorMessage, error);
   }
 
   return new AppError('An unknown error occurred', ErrorCode.UNKNOWN_ERROR, 500, error);
