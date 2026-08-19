@@ -16,6 +16,17 @@ export type JobPriority = 'immediate' | 'high' | 'medium' | 'low';
 
 export type ProductCondition = 'good' | 'dusty' | 'scratches' | 'damage' | 'liquid_damage' | 'not_working' | 'dead';
 
+export type PaymentMethod = 'cash' | 'upi' | 'card' | 'bank_transfer';
+
+export const PAYMENT_METHODS: PaymentMethod[] = ['cash', 'upi', 'card', 'bank_transfer'];
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash: 'Cash',
+  upi: 'UPI',
+  card: 'Card',
+  bank_transfer: 'Bank Transfer',
+};
+
 export const JOB_STATUS_ORDER: JobStatus[] = [
   'new',
   'inspected',

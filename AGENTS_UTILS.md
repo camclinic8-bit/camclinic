@@ -18,9 +18,9 @@ Re-exports: currency, dates, jobNumber, pdf
 - `getRelativeDate(date)` — "Today" / "Tomorrow" / formatted date
 
 ## `jobNumber.ts`
-- `generateJobNumber(sequence, date?)` — "CC-YYYYMMDD-NNNN" (TS utility, DB is source of truth)
-- `parseJobNumber(jobNumber)` — { date, sequence } | null
-- `isValidJobNumber(jobNumber)` — regex test /^CC-\d{8}-\d{4}$/
+- `generateJobNumber(sequence)` — "CC-NNNNN" global sequential, widens to 6 digits after 99999 (TS utility, DB is source of truth)
+- `parseJobNumber(jobNumber)` — { sequence } | null
+- `isValidJobNumber(jobNumber)` — regex test /^CC-\d{5,}$/
 
 ## `initials.ts`
 - `nameInitials(name)` — 2 letters: single word → first 2 chars, multi-word → first+last initial. null/undefined → "?"

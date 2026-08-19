@@ -31,7 +31,7 @@ import { formatDate, formatDateTime, isExpired, getLocalToday } from '@/lib/util
 import { formatINR } from '@/lib/utils/currency';
 import { getActiveTermsAndConditions } from '@/lib/db/terms';
 import { useBranchStore } from '@/stores/branchStore';
-import { JOB_STATUS_LABELS, PRODUCT_CONDITION_LABELS, JobStatus } from '@/types/enums';
+import { JOB_STATUS_LABELS, PRODUCT_CONDITION_LABELS, PAYMENT_METHOD_LABELS, PAYMENT_METHODS, JobStatus, PaymentMethod } from '@/types/enums';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { addPaymentTransaction } from '@/lib/db/jobs';
@@ -51,6 +51,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
   const [showPaymentInput, setShowPaymentInput] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [terms, setTerms] = useState<any>(null);
   const [activeImage, setActiveImage] = useState<string | null>(null);
 
@@ -90,19 +91,19 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     // Record payment transaction
     const supabase = createClient();
     try {
-      await addPaymentTransaction(supabase, job.id, amount, user.id, 'cash');
+      await addPaymentTransaction(supabase, job.id, amount, user.id, paymentMethod);
     } catch (error) {
       toast.error('Failed to record payment transaction');
       return;
     }
-    
+
     await updateCharges.mutateAsync({
       advance_paid: newAdvance,
       advance_paid_date: getLocalToday(),
     });
     setPaymentAmount('');
     setShowPaymentInput(false);
-    toast.success(`Payment of ${formatINR(amount)} recorded successfully`);
+    toast.success(`Payment of ${formatINR(amount)} (${PAYMENT_METHOD_LABELS[paymentMethod]}) recorded successfully`);
   };
 
   const handlePaymentAmountChange = (raw: string, balanceDue: number) => {
@@ -673,7 +674,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                                   <span className="text-gray-400 ml-2">by {transaction.created_by_user.full_name}</span>
                                 )}
                               </div>
-                              <span className="text-gray-500 capitalize">{transaction.payment_method}</span>
+                              <span className="text-gray-500">
+                                {PAYMENT_METHOD_LABELS[transaction.payment_method] ?? transaction.payment_method}
+                              </span>
                             </div>
                           ))}
                         </div>
@@ -685,6 +688,15 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                       <div className="pt-2">
                         {showPaymentInput ? (
                           <div className="space-y-2">
+                            <Select
+                              label="Payment Method"
+                              options={PAYMENT_METHODS.map((m) => ({
+                                value: m,
+                                label: PAYMENT_METHOD_LABELS[m],
+                              }))}
+                              value={paymentMethod}
+                              onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                            />
                             <div className="flex gap-2">
                               <input
                                 type="number"

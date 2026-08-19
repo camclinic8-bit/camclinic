@@ -60,7 +60,7 @@ This section provides a step-by-step guide for administrators, managers, and tec
      - Take and upload intake photos of the equipment to document its condition.
    - Enter any optional diagnostic fee or advance payment made by the customer.
    - Click **Create Job**.
-3. **Expected Outcome**: The job card is saved, a sequential job number (e.g., `CC-YYYYMMDD-0001`) is generated, and you are redirected to the job's details page.
+3. **Expected Outcome**: The job card is saved, a sequential job number (e.g., `CC-00001`) is generated, and you are redirected to the job's details page.
 
 #### 21.2.2 Handing Over the Intake Receipt
 1. **Steps**:

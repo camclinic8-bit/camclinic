@@ -150,7 +150,7 @@ sequenceDiagram
     Incharge->>DB: Check/Create Customer Record
     DB-->>Incharge: Customer ID returned
     Incharge->>DB: Submit Job & Products (create_job_with_products RPC)
-    DB-->>Incharge: Job Saved, Job ID & CC-YYYYMMDD-NNNN returned
+    DB-->>Incharge: Job Saved, Job ID & CC-NNNNN returned
     Incharge->>Customer: Print & hand over Job Receipt PDF
 
     Note over Incharge, Tech: Diagnostics Phase

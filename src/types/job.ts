@@ -1,4 +1,4 @@
-import { JobStatus, JobPriority, ProductCondition } from './enums';
+import { JobStatus, JobPriority, ProductCondition, PaymentMethod } from './enums';
 import { Customer } from './customer';
 import { Branch } from './branch';
 import { Profile } from './user';
@@ -9,7 +9,7 @@ export interface PaymentTransaction {
   job_id: string;
   amount: number;
   payment_date: string;
-  payment_method: string;
+  payment_method: PaymentMethod;
   notes: string | null;
   created_by: string | null;
   created_at: string;
@@ -141,6 +141,7 @@ export interface JobCreateInput {
   inspection_fee?: number;
   advance_paid?: number;
   advance_paid_date?: string | null;
+  advance_payment_method?: PaymentMethod;
   estimate_delivery_date?: string | null;
   spare_parts_total_cost?: number;
   alternative_contact?: string | null;
@@ -180,6 +181,7 @@ export interface JobUpdateInput {
   service_charges?: number;
   advance_paid?: number;
   advance_paid_date?: string | null;
+  advance_payment_method?: PaymentMethod | null;
   gst_enabled?: boolean;
   estimate_delivery_date?: string | null;
   spare_parts_total_cost?: number;

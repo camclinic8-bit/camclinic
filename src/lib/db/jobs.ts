@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { handleSupabaseError } from '@/lib/errors';
 import { normalizeJobProductWarrantyForDb } from '@/lib/utils/normalizeJobProduct';
 import { getLocalToday } from '@/lib/utils/dates';
 import { 
@@ -11,6 +12,7 @@ import {
   PaymentTransaction
 } from '@/types/job';
 import { JobStatus } from '@/types/enums';
+import type { PaymentMethod } from '@/types/enums';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TypedSupabaseClient = SupabaseClient<any>;
@@ -236,6 +238,7 @@ export async function createJob(
       p_advance_paid_date: input.advance_paid && input.advance_paid > 0
         ? input.advance_paid_date?.trim() || null
         : null,
+      p_advance_payment_method: input.advance_payment_method ?? 'cash',
       p_estimate_delivery_date: input.estimate_delivery_date?.trim() || null,
       p_spare_parts_total_cost: input.spare_parts_total_cost ?? 0,
       p_spare_parts_private_details: input.spare_parts_private_details || [],
@@ -243,7 +246,7 @@ export async function createJob(
       p_alternative_contact: input.alternative_contact?.trim() || null,
     });
 
-  if (error) throw error;
+  if (error) throw handleSupabaseError(error);
 
   // Fetch the complete job with relations
   const { data: job, error: fetchError } = await supabase
@@ -282,6 +285,7 @@ export async function updateJob(
       p_service_charges: input.service_charges ?? null,
       p_advance_paid: input.advance_paid ?? null,
       p_advance_paid_date: input.advance_paid_date ?? null,
+      p_advance_payment_method: input.advance_payment_method ?? null,
       p_gst_enabled: input.gst_enabled ?? null,
       p_estimate_delivery_date: input.estimate_delivery_date ?? null,
       p_spare_parts_total_cost: input.spare_parts_total_cost ?? null,
@@ -310,7 +314,7 @@ export async function addPaymentTransaction(
   jobId: string,
   amount: number,
   userId: string,
-  paymentMethod: string = 'cash',
+  paymentMethod: PaymentMethod = 'cash',
   notes?: string
 ): Promise<PaymentTransaction> {
   const { data, error } = await supabase
