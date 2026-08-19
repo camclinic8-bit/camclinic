@@ -181,7 +181,7 @@ Customer registration records.
 Represents the service job card, tracking charges, assignments, and statuses.
 - `id` (uuid, primary key): Unique identifier.
 - `shop_id` (uuid, foreign key referencing `shops.id` on delete cascade).
-- `job_number` (text, unique, not null): Auto-generated unique ticket ID (format: `CC-YYYYMMDD-NNNN`).
+- `job_number` (text, unique, not null): Auto-generated unique ticket ID (format: `CC-NNNNN`, global sequential from `CC-00001`; widens to 6 digits after `CC-99999`).
 - `customer_id` (uuid, foreign key referencing `customers.id` on delete restrict).
 - `service_branch_id` (uuid, foreign key referencing `branches.id` on delete restrict): Intake branch.
 - `delivery_branch_id` (uuid, foreign key referencing `branches.id` on delete restrict): Delivery branch.
@@ -549,7 +549,7 @@ sequenceDiagram
     Incharge->>DB: Check/Create Customer Record
     DB-->>Incharge: Customer ID returned
     Incharge->>DB: Submit Job & Products (create_job_with_products RPC)
-    DB-->>Incharge: Job Saved, Job ID & CC-YYYYMMDD-NNNN returned
+    DB-->>Incharge: Job Saved, Job ID & CC-NNNNN returned
     Incharge->>Customer: Print & hand over Job Receipt PDF
 
     Note over Incharge, Tech: Diagnostics Phase
@@ -1471,37 +1471,24 @@ CREATE POLICY delete_jobs_policy ON jobs
 This section details the PL/pgSQL routines used to execute transactional writes and auto-generate fields.
 
 ### 15.1 Get Next Job Number (`get_next_job_number`)
-Generates sequential, date-formatted job numbers atomically (format: `CC-YYYYMMDD-NNNN`).
+Generates globally sequential job numbers atomically (format: `CC-NNNNN`, starting at `CC-00001`; widens to 6 digits only after `CC-99999` is exhausted — see migration 034).
 ```sql
-CREATE OR REPLACE FUNCTION get_next_job_number(
-  p_shop_id UUID,
-  p_branch_id UUID
-) RETURNS TEXT AS $$
+CREATE OR REPLACE FUNCTION get_next_job_number(p_date DATE DEFAULT CURRENT_DATE)
+RETURNS TEXT AS $$
 DECLARE
-  v_date_str TEXT;
-  v_seq INTEGER;
-  v_count INTEGER;
-  v_job_number TEXT;
+  next_seq INT;
 BEGIN
-  -- 1. Get current date string in format YYYYMMDD
-  v_date_str := to_char(CURRENT_DATE, 'YYYYMMDD');
-  
-  -- 2. Count jobs matching the format for the shop today
-  -- Lock the matching rows to serialize sequential creation safely
-  SELECT COALESCE(MAX(SUBSTRING(job_number FROM 13)::INTEGER), 0)
-  INTO v_seq
-  FROM jobs
-  WHERE shop_id = p_shop_id
-    AND job_number LIKE 'CC-' || v_date_str || '-%'
-  FOR UPDATE;
+  -- Serialize number generation globally; held until the surrounding
+  -- transaction completes so concurrent creators cannot observe the same MAX.
+  PERFORM pg_advisory_xact_lock(hashtext('cam-clinic-job-number'));
 
-  -- 3. Increment sequence
-  v_seq := v_seq + 1;
-  
-  -- 4. Build job number: CC-YYYYMMDD-0001
-  v_job_number := 'CC-' || v_date_str || '-' || lpad(v_seq::TEXT, 4, '0');
-  
-  RETURN v_job_number;
+  SELECT COALESCE(MAX(CAST(SUBSTRING(job_number FROM 4) AS INT)), 0) + 1
+  INTO next_seq
+  FROM jobs
+  WHERE job_number ~ '^CC-[0-9]+$';
+
+  -- LPAD keeps 5 digits (00001..99999); beyond that the number widens to 6.
+  RETURN 'CC-' || LPAD(next_seq::TEXT, 5, '0');
 END;
 $$ LANGUAGE plpgsql;
 ```
@@ -2396,7 +2383,7 @@ This section provides a step-by-step guide for administrators, managers, and tec
      - Take and upload intake photos of the equipment to document its condition.
    - Enter any optional diagnostic fee or advance payment made by the customer.
    - Click **Create Job**.
-3. **Expected Outcome**: The job card is saved, a sequential job number (e.g., `CC-YYYYMMDD-0001`) is generated, and you are redirected to the job's details page.
+3. **Expected Outcome**: The job card is saved, a sequential job number (e.g., `CC-00001`) is generated, and you are redirected to the job's details page.
 
 #### 21.2.2 Handing Over the Intake Receipt
 1. **Steps**:

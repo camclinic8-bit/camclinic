@@ -31,6 +31,8 @@ import {
   JOB_PRIORITY_LABELS,
   JOB_STATUS_LABELS,
   PRODUCT_CONDITION_LABELS,
+  PAYMENT_METHOD_LABELS,
+  PAYMENT_METHODS,
   ProductCondition,
 } from '@/types/enums';
 import { formatINR } from '@/lib/utils/currency';
@@ -92,6 +94,7 @@ const editJobSchema = z.object({
   service_charges: nonNegativeNumberOrZero,
   advance_paid: nonNegativeNumberOrZero,
   advance_paid_date: optionalDateInput,
+  advance_payment_method: z.enum(['cash', 'upi', 'card', 'bank_transfer']).default('cash'),
   gst_enabled: z.boolean(),
   estimate_delivery_date: optionalDateInput,
   spare_parts_total_cost: nonNegativeNumberOrZero,
@@ -232,6 +235,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
     resolver: zodResolver(editJobSchema) as Resolver<EditJobFormData>,
     defaultValues: {
       gst_enabled: false,
+      advance_payment_method: 'cash',
       products: [{ has_warranty: false, accessories: [], other_parts: [] }],
       spare_parts_private_details: [],
       alternative_contact: '',
@@ -265,6 +269,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
         service_charges: job.service_charges,
         advance_paid: job.advance_paid,
         advance_paid_date: job.advance_paid_date || '',
+        advance_payment_method: 'cash',
         gst_enabled: job.gst_enabled,
         estimate_delivery_date: job.estimate_delivery_date || '',
         spare_parts_total_cost: job.spare_parts_total_cost || 0,
@@ -309,6 +314,10 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
   const conditionOptions = Object.entries(PRODUCT_CONDITION_LABELS).map(([value, label]) => ({
     value,
     label,
+  }));
+  const paymentMethodOptions = PAYMENT_METHODS.map((m) => ({
+    value: m,
+    label: PAYMENT_METHOD_LABELS[m],
   }));
   const branchOptions = (branches || []).map((b) => ({ value: b.id, label: b.name }));
   const technicianOptions = [
@@ -430,6 +439,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
               data.advance_paid && data.advance_paid > 0
                 ? data.advance_paid_date?.trim() || null
                 : null,
+            advance_payment_method: data.advance_payment_method ?? 'cash',
             gst_enabled: data.gst_enabled,
             estimate_delivery_date: data.estimate_delivery_date?.trim() || null,
             spare_parts_total_cost: data.spare_parts_total_cost ?? 0,
@@ -725,7 +735,7 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                   {...register('estimate_delivery_date')}
                 />
               </div>
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-3 gap-4">
                 <Input
                   type="number"
                   label="Advance Paid (₹) (optional)"
@@ -735,6 +745,11 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                   type="date"
                   label="Advance Paid Date (optional)"
                   {...register('advance_paid_date')}
+                />
+                <Select
+                  label="Advance Payment Method"
+                  options={paymentMethodOptions}
+                  {...register('advance_payment_method')}
                 />
               </div>
               <div className="space-y-1">
@@ -804,12 +819,12 @@ export default function EditJobPage({ params }: { params: Promise<{ id: string }
                   <div className="grid md:grid-cols-2 gap-4">
                     <Input
                       label="Repeat Job Number"
-                      placeholder="e.g. CC-20250101-0001"
+                      placeholder="e.g. CC-00001"
                       {...register(`products.${index}.repeat_job_number`)}
                     />
                     <Input
                       label="Other Job Number"
-                      placeholder="e.g. CC-20250101-0002"
+                      placeholder="e.g. CC-00002"
                       {...register(`products.${index}.other_job_number`)}
                     />
                   </div>

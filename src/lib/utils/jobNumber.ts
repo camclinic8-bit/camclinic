@@ -1,41 +1,37 @@
-import { format } from 'date-fns';
+/**
+ * Job numbers use a global sequential counter: CC-00001, CC-00002, ...
+ * The counter is 5 digits (zero-padded) and widens to 6 digits (CC-100000)
+ * only after the 5-digit space (99999) is exhausted.
+ *
+ * The authoritative generator is the DB RPC `get_next_job_number`
+ * (see supabase/migrations/034_sequential_job_numbers.sql). These helpers
+ * mirror that format for client-side use.
+ */
+
+/** Minimum digits used for the sequence part of a job number. */
+export const JOB_NUMBER_MIN_DIGITS = 5;
 
 /**
- * Generate a job number in format: CC-YYYYMMDD-XXXX
- * Example: CC-20260401-0001
- * 
- * @param sequence - The sequence number for the day (1-9999)
- * @param date - Optional date, defaults to current date
+ * Format a sequence number as a job number: CC-NNNNN
+ * Example: generateJobNumber(1) -> "CC-00001", generateJobNumber(100000) -> "CC-100000"
  */
-export function generateJobNumber(sequence: number, date?: Date): string {
-  const dateToUse = date || new Date();
-  const dateStr = format(dateToUse, 'yyyyMMdd');
-  const sequenceStr = sequence.toString().padStart(4, '0');
-  return `CC-${dateStr}-${sequenceStr}`;
+export function generateJobNumber(sequence: number): string {
+  return `CC-${String(sequence).padStart(JOB_NUMBER_MIN_DIGITS, '0')}`;
 }
 
 /**
- * Parse a job number to extract date and sequence
- * Returns null if invalid format
+ * Parse a job number to extract its sequence.
+ * Returns null if invalid format.
  */
-export function parseJobNumber(jobNumber: string): { date: Date; sequence: number } | null {
-  const match = jobNumber.match(/^CC-(\d{8})-(\d{4})$/);
+export function parseJobNumber(jobNumber: string): { sequence: number } | null {
+  const match = jobNumber.match(/^CC-(\d+)$/);
   if (!match) return null;
-  
-  const [, dateStr, sequenceStr] = match;
-  const year = parseInt(dateStr.substring(0, 4));
-  const month = parseInt(dateStr.substring(4, 6)) - 1;
-  const day = parseInt(dateStr.substring(6, 8));
-  
-  return {
-    date: new Date(year, month, day),
-    sequence: parseInt(sequenceStr),
-  };
+  return { sequence: parseInt(match[1], 10) };
 }
 
 /**
- * Validate job number format
+ * Validate job number format: CC- followed by 5+ digits
  */
 export function isValidJobNumber(jobNumber: string): boolean {
-  return /^CC-\d{8}-\d{4}$/.test(jobNumber);
+  return /^CC-\d{5,}$/.test(jobNumber);
 }

@@ -19,7 +19,7 @@ import { useCreateJob } from '@/hooks/useJobs';
 import { useSearchCustomers, useCreateCustomer } from '@/hooks/useCustomers';
 import { useBranches } from '@/hooks/useBranches';
 import { useTechnicians, useServiceIncharges } from '@/hooks/useTechnicians';
-import { JOB_PRIORITY_LABELS, PRODUCT_CONDITION_LABELS, ProductCondition } from '@/types/enums';
+import { JOB_PRIORITY_LABELS, PRODUCT_CONDITION_LABELS, PAYMENT_METHOD_LABELS, PAYMENT_METHODS, ProductCondition } from '@/types/enums';
 import { Customer } from '@/types/customer';
 import { toast } from 'sonner';
 import {
@@ -58,6 +58,7 @@ const jobSchema = z.object({
   inspection_fee: optionalNonNegativeNumber,
   advance_paid: optionalNonNegativeNumber,
   advance_paid_date: optionalDateInput,
+  advance_payment_method: z.enum(['cash', 'upi', 'card', 'bank_transfer']).default('cash'),
   estimate_delivery_date: optionalDateInput,
   spare_parts_total_cost: optionalNonNegativeNumber,
   spare_parts_private_details: z.array(
@@ -98,6 +99,7 @@ export default function NewJobPage() {
     resolver: zodResolver(jobSchema) as Resolver<JobFormData>,
     defaultValues: {
       priority: 'medium',
+      advance_payment_method: 'cash',
       alternative_contact: '',
       spare_parts_total_cost: 0,
       products: [{ has_warranty: false, accessories: [], other_parts: [], warranty_images: [], product_images: [] }],
@@ -119,6 +121,11 @@ export default function NewJobPage() {
   const conditionOptions = Object.entries(PRODUCT_CONDITION_LABELS).map(([value, label]) => ({
     value,
     label,
+  }));
+
+  const paymentMethodOptions = PAYMENT_METHODS.map((m) => ({
+    value: m,
+    label: PAYMENT_METHOD_LABELS[m],
   }));
 
   const branchOptions = (branches || []).map(b => ({ value: b.id, label: b.name }));
@@ -405,6 +412,11 @@ export default function NewJobPage() {
                   label="Advance Paid Date (optional)"
                   {...register('advance_paid_date')}
                 />
+                <Select
+                  label="Advance Payment Method"
+                  options={paymentMethodOptions}
+                  {...register('advance_payment_method')}
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -467,12 +479,12 @@ export default function NewJobPage() {
                   <div className="grid md:grid-cols-2 gap-4">
                     <Input
                       label="Repeat Job Number"
-                      placeholder="e.g. CC-20250101-0001"
+                      placeholder="e.g. CC-00001"
                       {...register(`products.${index}.repeat_job_number`)}
                     />
                     <Input
                       label="Other Job Number"
-                      placeholder="e.g. CC-20250101-0002"
+                      placeholder="e.g. CC-00002"
                       {...register(`products.${index}.other_job_number`)}
                     />
                   </div>

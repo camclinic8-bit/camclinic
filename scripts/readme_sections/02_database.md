@@ -90,7 +90,7 @@ Customer registration records.
 Represents the service job card, tracking charges, assignments, and statuses.
 - `id` (uuid, primary key): Unique identifier.
 - `shop_id` (uuid, foreign key referencing `shops.id` on delete cascade).
-- `job_number` (text, unique, not null): Auto-generated unique ticket ID (format: `CC-YYYYMMDD-NNNN`).
+- `job_number` (text, unique, not null): Auto-generated unique ticket ID (format: `CC-NNNNN`, global sequential from `CC-00001`; widens to 6 digits after `CC-99999`).
 - `customer_id` (uuid, foreign key referencing `customers.id` on delete restrict).
 - `service_branch_id` (uuid, foreign key referencing `branches.id` on delete restrict): Intake branch.
 - `delivery_branch_id` (uuid, foreign key referencing `branches.id` on delete restrict): Delivery branch.

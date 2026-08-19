@@ -3,37 +3,24 @@
 This section details the PL/pgSQL routines used to execute transactional writes and auto-generate fields.
 
 ### 15.1 Get Next Job Number (`get_next_job_number`)
-Generates sequential, date-formatted job numbers atomically (format: `CC-YYYYMMDD-NNNN`).
+Generates globally sequential job numbers atomically (format: `CC-NNNNN`, starting at `CC-00001`; widens to 6 digits only after `CC-99999` is exhausted — see migration 034).
 ```sql
-CREATE OR REPLACE FUNCTION get_next_job_number(
-  p_shop_id UUID,
-  p_branch_id UUID
-) RETURNS TEXT AS $$
+CREATE OR REPLACE FUNCTION get_next_job_number(p_date DATE DEFAULT CURRENT_DATE)
+RETURNS TEXT AS $$
 DECLARE
-  v_date_str TEXT;
-  v_seq INTEGER;
-  v_count INTEGER;
-  v_job_number TEXT;
+  next_seq INT;
 BEGIN
-  -- 1. Get current date string in format YYYYMMDD
-  v_date_str := to_char(CURRENT_DATE, 'YYYYMMDD');
-  
-  -- 2. Count jobs matching the format for the shop today
-  -- Lock the matching rows to serialize sequential creation safely
-  SELECT COALESCE(MAX(SUBSTRING(job_number FROM 13)::INTEGER), 0)
-  INTO v_seq
-  FROM jobs
-  WHERE shop_id = p_shop_id
-    AND job_number LIKE 'CC-' || v_date_str || '-%'
-  FOR UPDATE;
+  -- Serialize number generation globally; held until the surrounding
+  -- transaction completes so concurrent creators cannot observe the same MAX.
+  PERFORM pg_advisory_xact_lock(hashtext('cam-clinic-job-number'));
 
-  -- 3. Increment sequence
-  v_seq := v_seq + 1;
-  
-  -- 4. Build job number: CC-YYYYMMDD-0001
-  v_job_number := 'CC-' || v_date_str || '-' || lpad(v_seq::TEXT, 4, '0');
-  
-  RETURN v_job_number;
+  SELECT COALESCE(MAX(CAST(SUBSTRING(job_number FROM 4) AS INT)), 0) + 1
+  INTO next_seq
+  FROM jobs
+  WHERE job_number ~ '^CC-[0-9]+$';
+
+  -- LPAD keeps 5 digits (00001..99999); beyond that the number widens to 6.
+  RETURN 'CC-' || LPAD(next_seq::TEXT, 5, '0');
 END;
 $$ LANGUAGE plpgsql;
 ```
