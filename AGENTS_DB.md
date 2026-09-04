@@ -5,7 +5,7 @@
 ### `jobs.ts`
 All functions take `(supabase, ...params)`.
 - `getJobs(filters?, page?, pageSize?)` — paginated list with joins (customer, branches, profiles, products). Filters: status[], priority[], branch_id, technician_id, customer_id, date range, search (job_number/customer name/phone), sort
-- `getJobById(id)` — full detail with all joins including products+accessories+other_parts, spare_parts, status_history+user
+- `getJobById(id)` — full detail with all joins including products+accessories+other_parts, spare_parts, status_history+user, service_branch incl. contact fields (address/phone/email/landline — used by bill PDF header)
 - `createJob(input, shopId, createdBy)` — calls RPC `get_next_job_number`, inserts job + products + accessories/parts + status_history
 - `updateJob(id, input, userId)` — updates fields, logs status_history if status changed
 - `updateJobStatus(id, status, userId, notes?)` — sets service_date if completed, logs history
