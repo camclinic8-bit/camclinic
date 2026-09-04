@@ -27,8 +27,14 @@ async function svgToPng(svgString: string): Promise<string> {
     
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      canvas.width = img.width * 2; // 2x for better quality
-      canvas.height = img.height * 2;
+      // The logo prints at ~35mm wide; anything beyond ~1000px raster width only
+      // bloats the embedded PNG (the source SVG is 1769pt wide, and 2x of that
+      // produced ~30MB PDFs).
+      const intrinsicW = img.naturalWidth || img.width || 300;
+      const intrinsicH = img.naturalHeight || img.height || 114;
+      const targetW = Math.min(intrinsicW * 2, 1000);
+      canvas.width = Math.round(targetW);
+      canvas.height = Math.round(targetW * (intrinsicH / intrinsicW));
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -95,10 +101,11 @@ async function addHeader(doc: jsPDF, title: string, branch?: Branch | null): Pro
   let emailVal: string | null;
 
   if (branch) {
-    addressText = branch.address || branch.name;
-    phoneVal = branch.phone || null;
-    landlineVal = branch.landline || null;
-    emailVal = branch.email || null;
+    // trim(): some branch rows store trailing spaces (e.g. Thrissur phone)
+    addressText = branch.address?.trim() || branch.name;
+    phoneVal = branch.phone?.trim() || null;
+    landlineVal = branch.landline?.trim() || null;
+    emailVal = branch.email?.trim() || null;
   } else {
     addressText = COMPANY_ADDRESS;
     phoneVal = COMPANY_MOBILE;
