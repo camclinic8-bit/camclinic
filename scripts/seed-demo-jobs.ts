@@ -7,12 +7,17 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { randomBytes } from 'crypto';
 import { config } from 'dotenv';
 import { resolve } from 'path';
 
 config({ path: resolve(process.cwd(), '.env.local') });
 
 const SEED_PREFIX = 'CC-SEED';
+
+// Random per-run password for seeded demo accounts (override via env for
+// scripted use) — no hardcoded credentials in source.
+const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD || randomBytes(12).toString('base64url');
 const JOB_COUNT = 120;
 const NEW_USERS = 24;
 
@@ -212,8 +217,6 @@ async function main() {
   console.log(`Shop: ${shop.name} (${shop.id})`);
   console.log(`Branches: ${branches.map((b) => b.name).join(', ')}`);
   console.log(`Creator profile: ${creator.full_name} (${creator.role})`);
-
-  const DEMO_PASSWORD = 'DemoSeed2026!';
 
   for (let u = 0; u < NEW_USERS; u++) {
     const email = `seed.user.${pad(u + 1, 3)}@camclinic.seed`;

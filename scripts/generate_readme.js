@@ -15,7 +15,10 @@ let readmeContent = '';
 
 // Read and append each section
 files.forEach((file) => {
-  const filePath = path.join(SECTIONS_DIR, file);
+  const filePath = path.resolve(SECTIONS_DIR, file);
+  if (!filePath.startsWith(SECTIONS_DIR + path.sep)) {
+    throw new Error(`Refusing to read outside sections dir: ${file}`);
+  }
   const content = fs.readFileSync(filePath, 'utf8');
   readmeContent += content + '\n\n';
 });
