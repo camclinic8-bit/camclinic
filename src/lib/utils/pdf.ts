@@ -7,7 +7,7 @@ import { TermsAndConditions } from '@/types/job';
 
 const APP_NAME = 'CamClinic';
 const COMPANY_ADDRESS = '"NAVELKAR TRADE CENTRE"\nSHOP NO 4, GROUND FLOOR,\nOPP. AZAD MAIDAN,\nBEHIND CASA MADHAV\nM. G. ROAD, PANAJI, GOA 403001';
-const COMPANY_MOBILE = '992 3133449';
+const COMPANY_MOBILE = '9637933449'; // Panjim HQ — keep in sync with branches table
 const COMPANY_EMAIL = 'info@camclinicgoa.com';
 const COMPANY_GSTIN = '30AAGFC6231M1ZN';
 
@@ -86,18 +86,24 @@ async function addHeader(doc: jsPDF, title: string, branch?: Branch | null): Pro
   }
 
   // Right side: Address and contact details (Location first, then MOB, TEL, EMAIL, GSTIN)
-  let addressText = '';
-  let phoneVal = COMPANY_MOBILE;
-  let landlineVal = '';
-  let emailVal = COMPANY_EMAIL;
+  // When a branch is provided, print ONLY that branch's live contact details —
+  // per-field fallbacks to the company defaults would print another branch's
+  // number on the bill.
+  let addressText: string;
+  let phoneVal: string | null;
+  let landlineVal: string | null;
+  let emailVal: string | null;
 
   if (branch) {
     addressText = branch.address || branch.name;
-    if (branch.phone) phoneVal = branch.phone;
-    if (branch.landline) landlineVal = branch.landline;
-    if (branch.email) emailVal = branch.email;
+    phoneVal = branch.phone || null;
+    landlineVal = branch.landline || null;
+    emailVal = branch.email || null;
   } else {
     addressText = COMPANY_ADDRESS;
+    phoneVal = COMPANY_MOBILE;
+    landlineVal = null;
+    emailVal = COMPANY_EMAIL;
   }
 
   // Make the entire right side bold
@@ -114,8 +120,10 @@ async function addHeader(doc: jsPDF, title: string, branch?: Branch | null): Pro
   });
 
   // 2. Mobile
-  doc.text(`MOB: ${phoneVal}`, rightAlignX, rightY, { align: 'right' });
-  rightY += lineHeight;
+  if (phoneVal) {
+    doc.text(`MOB: ${phoneVal}`, rightAlignX, rightY, { align: 'right' });
+    rightY += lineHeight;
+  }
 
   // 3. Landline (if exists)
   if (landlineVal) {
@@ -124,8 +132,10 @@ async function addHeader(doc: jsPDF, title: string, branch?: Branch | null): Pro
   }
 
   // 4. Email
-  doc.text(`EMAIL: ${emailVal}`, rightAlignX, rightY, { align: 'right' });
-  rightY += lineHeight;
+  if (emailVal) {
+    doc.text(`EMAIL: ${emailVal}`, rightAlignX, rightY, { align: 'right' });
+    rightY += lineHeight;
+  }
 
   // 5. GSTIN
   doc.text(`GSTIN: ${COMPANY_GSTIN}`, rightAlignX, rightY, { align: 'right' });

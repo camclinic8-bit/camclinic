@@ -35,7 +35,7 @@ Re-exports: currency, dates, jobNumber, pdf
 - `normalizeJobProductWarrantyForDb(p)` — clears warranty fields when no warranty
 
 ## `pdf.ts` (jsPDF + jspdf-autotable)
-- `generateReceipt(job)` — "SERVICE RECEIPT". Header + job info + customer + products A-Z table + problem description + charges + payment/est dates + signature footer
+- `generateReceipt(job, branch?)` — "SERVICE RECEIPT". Header prints the service branch's live contact (address/phone/landline/email from branches table; company constants only when no branch) + job info + customer + products A-Z table + problem description + charges + payment/est dates + signature footer
 - `generateQuote(job)` — "SERVICE QUOTATION". Same structure + advisory notes
 - `generateInvoice(job)` — "SERVICE INVOICE". Same structure + payment status (PAID IN FULL / Balance Due)
 - `downloadPDF(doc, filename)` — doc.save(filename)

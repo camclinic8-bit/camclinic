@@ -134,7 +134,7 @@ export async function getJobById(
       `
       *,
       customer:customers(id, name, phone, email, address),
-      service_branch:branches!jobs_service_branch_id_fkey(id, name),
+      service_branch:branches!jobs_service_branch_id_fkey(id, name, address, phone, email, landline),
       delivery_branch:branches!jobs_delivery_branch_id_fkey(id, name),
       assigned_technician:profiles!jobs_assigned_technician_id_fkey(id, full_name),
       products:job_products(
