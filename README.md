@@ -181,7 +181,7 @@ Customer registration records.
 Represents the service job card, tracking charges, assignments, and statuses.
 - `id` (uuid, primary key): Unique identifier.
 - `shop_id` (uuid, foreign key referencing `shops.id` on delete cascade).
-- `job_number` (text, unique, not null): Auto-generated unique ticket ID (format: `CC-NNNNN`, global sequential from `CC-00001`; widens to 6 digits after `CC-99999`).
+- `job_number` (text, unique, not null): Auto-generated unique ticket ID (format: `CC-NNNNN`, globally sequential; drawn from the `job_number_seq` sequence which continues the shop's legacy series — next new job is `CC-05201`. Widens to 6 digits after `CC-99999`; see migrations 034 and 036).
 - `customer_id` (uuid, foreign key referencing `customers.id` on delete restrict).
 - `service_branch_id` (uuid, foreign key referencing `branches.id` on delete restrict): Intake branch.
 - `delivery_branch_id` (uuid, foreign key referencing `branches.id` on delete restrict): Delivery branch.
@@ -1471,24 +1471,15 @@ CREATE POLICY delete_jobs_policy ON jobs
 This section details the PL/pgSQL routines used to execute transactional writes and auto-generate fields.
 
 ### 15.1 Get Next Job Number (`get_next_job_number`)
-Generates globally sequential job numbers atomically (format: `CC-NNNNN`, starting at `CC-00001`; widens to 6 digits only after `CC-99999` is exhausted — see migration 034).
+Generates globally sequential job numbers atomically (format: `CC-NNNNN`; widens to 6 digits only after `CC-99999` is exhausted). Numbers are drawn from the `job_number_seq` Postgres sequence, anchored at 5200 so the series continues the shop's legacy (pre-app) numbering — the next new job is `CC-05201` (see migrations 034 and 036).
 ```sql
 CREATE OR REPLACE FUNCTION get_next_job_number(p_date DATE DEFAULT CURRENT_DATE)
 RETURNS TEXT AS $$
-DECLARE
-  next_seq INT;
 BEGIN
-  -- Serialize number generation globally; held until the surrounding
-  -- transaction completes so concurrent creators cannot observe the same MAX.
-  PERFORM pg_advisory_xact_lock(hashtext('cam-clinic-job-number'));
-
-  SELECT COALESCE(MAX(CAST(SUBSTRING(job_number FROM 4) AS INT)), 0) + 1
-  INTO next_seq
-  FROM jobs
-  WHERE job_number ~ '^CC-[0-9]+$';
-
+  -- nextval() is atomic; no advisory lock needed. The p_date parameter is
+  -- unused and kept only for signature compatibility with existing callers.
   -- LPAD keeps 5 digits (00001..99999); beyond that the number widens to 6.
-  RETURN 'CC-' || LPAD(next_seq::TEXT, 5, '0');
+  RETURN 'CC-' || LPAD(nextval('job_number_seq')::TEXT, 5, '0');
 END;
 $$ LANGUAGE plpgsql;
 ```
