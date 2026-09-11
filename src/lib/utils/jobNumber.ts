@@ -3,9 +3,11 @@
  * The counter is 5 digits (zero-padded) and widens to 6 digits (CC-100000)
  * only after the 5-digit space (99999) is exhausted.
  *
- * The authoritative generator is the DB RPC `get_next_job_number`
- * (see supabase/migrations/034_sequential_job_numbers.sql). These helpers
- * mirror that format for client-side use.
+ * The authoritative generator is the DB RPC `get_next_job_number`, which
+ * draws from the `job_number_seq` Postgres sequence (migration 036). That
+ * sequence was anchored at 5200 so numbering continues the shop's legacy
+ * (pre-app) series — the next new job is CC-05201. Do NOT "reset" it to 1.
+ * These helpers mirror the format for client-side use.
  */
 
 /** Minimum digits used for the sequence part of a job number. */

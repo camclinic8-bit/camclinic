@@ -49,7 +49,7 @@ Next.js 16.2 / React 19.2 / TS5 strict / Tailwind v4 / Supabase SSR / TanStack Q
 - `canViewAllBranches`: SA/SM | `canSetAnyStatus`: SA/SM
 
 ## Key Business Rules
-- Job # format: `CC-NNNNN` global sequential starting `CC-00001` (mig 034; DB RPC `get_next_job_number`). Widens to 6 digits (`CC-100000`) only after `CC-99999` is used
+- Job # format: `CC-NNNNN` global sequential, drawn from the `job_number_seq` Postgres sequence (mig 036; DB RPC `get_next_job_number`). Sequence anchored at 5200 to continue the shop's legacy series — next new job is `CC-05201`; jobs before mig 036 keep `CC-00001`..`CC-00134`. Widens to 6 digits (`CC-100000`) only after `CC-99999` is used
 - Payment tracking: every payment records a method — `cash` | `upi` | `card` | `bank_transfer` (`payment_transactions.payment_method`, CHECK-constrained; mig 035). Advance at creation/edit flows through `p_advance_payment_method` RPC params and is recorded as a transaction
 - Finance trigger: `total_charges = inspection_fee + service_charges + spare_parts`; `gst = service_charges × 0.18` (if enabled); `grand_total = total_charges + gst`; `balance = grand_total - advance_paid`
 - Technician sees only assigned jobs (client filter + RLS)
