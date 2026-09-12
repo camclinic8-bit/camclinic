@@ -38,7 +38,7 @@ async function main() {
   // 2. All jobs, grouped by number shape
   const { data: all, error: allErr } = await supabase
     .from('jobs')
-    .select('job_number, created_at');
+    .select('id, job_number, created_at');
   if (allErr) throw allErr;
 
   const nullCount = all.filter((j) => j.job_number == null).length;
