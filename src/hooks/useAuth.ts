@@ -18,7 +18,22 @@ export function useAuth() {
     setLoading(true);
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      // Race with a timeout: on a hung network the auth POST never settles,
+      // which would leave the Sign In button spinning forever with no retry.
+      const { error } = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        new Promise<never>((_, reject) =>
+          window.setTimeout(
+            () =>
+              reject(
+                new Error(
+                  'Network is not responding — check the internet connection and try again.'
+                )
+              ),
+            20000
+          )
+        ),
+      ]);
       if (error) throw error;
       // Reset loading explicitly — SIGNED_IN event in AuthInitializer also resets
       // it, but calling it here eliminates any race between router.push and the event.

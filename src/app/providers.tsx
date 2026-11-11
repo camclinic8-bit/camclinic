@@ -123,9 +123,26 @@ function AuthInitializer() {
       }
     }, 4000);
 
+    // Bounded auto-recovery: if bootstrap is still stuck after 10s, the first
+    // auth request is hung (supabase-js holds an internal lock while a hung
+    // request never settles, so in-page retries can't start). One full reload
+    // re-bootstraps the app. Guarded by sessionStorage — at most once per tab
+    // session, so a truly dead network just keeps the message, no reload loop.
+    const autoRecoveryTimeout = window.setTimeout(() => {
+      if (!isMounted || !useAuthStore.getState().isLoading) return;
+      try {
+        if (sessionStorage.getItem('cc-auth-auto-reloaded') === '1') return;
+        sessionStorage.setItem('cc-auth-auto-reloaded', '1');
+        window.location.reload();
+      } catch {
+        // sessionStorage unavailable (private mode) — skip auto-recovery
+      }
+    }, 10000);
+
     return () => {
       isMounted = false;
       window.clearTimeout(slowConnectionTimeout);
+      window.clearTimeout(autoRecoveryTimeout);
       subscription.unsubscribe();
     };
     // Zustand setters are stable — subscribe once on mount

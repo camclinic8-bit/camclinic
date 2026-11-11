@@ -41,9 +41,10 @@ function AuthGate({ children }: { children: ReactNode }) {
         <div className="flex-1 bg-gray-50 flex items-center justify-center px-4">
           {isSlowConnection && (
             <p className="text-sm text-gray-500 text-center max-w-sm">
-              Still connecting — this is taking longer than usual. Check your
-              internet connection or any ad-blocker/proxy that may be blocking
-              the database service, then refresh.
+              Still connecting — this is taking longer than usual. Check the
+              internet connection (or an ad-blocker/proxy blocking the site).
+              Retrying automatically… if this message stays, press F5 to
+              refresh.
             </p>
           )}
         </div>
