@@ -84,6 +84,13 @@ function AuthInitializer() {
         } else if (event === 'SIGNED_IN' && session?.user) {
           // Fires after signInWithPassword succeeds.
           await applySessionState(session);
+          // If the user is still on /login — e.g. the sign-in was slow and the
+          // 20s timeout already showed an error while the session actually
+          // established — move them into the app instead of leaving a
+          // misleading error behind.
+          if (window.location.pathname.startsWith('/login')) {
+            window.location.replace('/dashboard');
+          }
         } else if (event === 'SIGNED_OUT') {
           if (isMounted) {
             useAuthStore.getState().logout();
