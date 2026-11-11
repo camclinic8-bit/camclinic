@@ -3,7 +3,7 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, createRealtimeClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import type { Profile } from '@/types/user';
 
@@ -25,7 +25,7 @@ import type { Profile } from '@/types/user';
  *   harmless (idempotent state updates).
  */
 function AuthInitializer() {
-  const { setUser, setLoading, setAuthenticated } = useAuthStore();
+  const { setUser, setLoading, setAuthenticated, setSlowConnection } = useAuthStore();
 
   useEffect(() => {
     const supabase = createClient();
@@ -65,6 +65,7 @@ function AuthInitializer() {
       if (session?.user) {
         setAuthenticated(true);
         setLoading(false);
+        setSlowConnection(false);
         void loadProfile(session.user.id);
         return;
       }
@@ -72,6 +73,7 @@ function AuthInitializer() {
       setAuthenticated(false);
       setUser(null);
       setLoading(false);
+      setSlowConnection(false);
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -105,26 +107,25 @@ function AuthInitializer() {
         }
       })
       .catch(() => {
-        if (isMounted) {
-          setAuthenticated(false);
-          setUser(null);
-          setLoading(false);
-        }
+        // getSession only rejects when Supabase is unreachable AND the stored
+        // token needs a refresh. In that case INITIAL_SESSION/SIGNED_OUT will
+        // still settle auth state once the network recovers — do NOT force a
+        // logout here: forcing it while the server still has a valid session
+        // cookie causes a /login ↔ /dashboard redirect loop on slow networks.
       });
 
-    // Final safety net: never allow infinite skeleton.
-    const loadingTimeout = window.setTimeout(() => {
-      if (!isMounted) return;
-      if (useAuthStore.getState().isLoading) {
-        setAuthenticated(false);
-        setUser(null);
-        setLoading(false);
+    // Slow-connection hint only. Never force `isAuthenticated: false` from a
+    // timer: the middleware still sees a valid session and would bounce the
+    // user straight back from /login, creating an endless redirect loop.
+    const slowConnectionTimeout = window.setTimeout(() => {
+      if (isMounted && useAuthStore.getState().isLoading) {
+        setSlowConnection(true);
       }
     }, 4000);
 
     return () => {
       isMounted = false;
-      window.clearTimeout(loadingTimeout);
+      window.clearTimeout(slowConnectionTimeout);
       subscription.unsubscribe();
     };
     // Zustand setters are stable — subscribe once on mount
@@ -140,7 +141,7 @@ function RealtimeInitializer({ queryClient }: { queryClient: QueryClient }) {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const supabase = createClient();
+    const supabase = createRealtimeClient();
 
     const channel = supabase
       .channel('jobs-realtime')
