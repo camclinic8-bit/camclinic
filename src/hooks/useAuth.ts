@@ -41,6 +41,13 @@ export function useAuth() {
       router.push('/dashboard');
     } catch (error) {
       setLoading(false);
+      // The session may have established right after the timeout fired
+      // (slow first sign-in while a token refresh held the auth lock).
+      // In that case proceed to the app instead of showing an error.
+      if (useAuthStore.getState().isAuthenticated) {
+        router.push('/dashboard');
+        return;
+      }
       throw error;
     }
   };

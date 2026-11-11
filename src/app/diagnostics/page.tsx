@@ -1,13 +1,15 @@
 'use client';
 
 /**
- * Public network diagnostics page — excluded from the auth middleware.
+ * Public network + auth diagnostics page — excluded from the auth middleware.
  * Open on any machine having trouble reaching the app; it tests each hop
- * (CDN, edge, API proxy, direct database) and shows what is broken.
+ * (CDN, edge, API proxy, direct database), the real auth engine, local
+ * session data health, and can clear corrupted local data.
  * URL: /diagnostics
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
 type TestResult = {
   name: string;
@@ -20,6 +22,15 @@ type TestResult = {
 };
 
 const TIMEOUT_MS = 10000;
+
+function raceTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(label)), ms)
+    ),
+  ]);
+}
 
 async function timedFetch(
   url: string,
@@ -38,11 +49,39 @@ async function timedFetch(
 
 const SUPABASE_HOST = 'ddtrzryqobmurqlgclxd.supabase.co';
 
+type AuthTest = {
+  outcome: 'pass' | 'fail' | 'hang';
+  ms?: number;
+  detail: string;
+};
+
 export default function DiagnosticsPage() {
   const [results, setResults] = useState<TestResult[]>([]);
   const [running, setRunning] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [ipInfo, setIpInfo] = useState<string>('');
+  const [ipInfo, setIpInfo] = useState('');
+
+  // Deep auth state
+  const [authTest, setAuthTest] = useState<AuthTest | null>(null);
+  const [cookieList, setCookieList] = useState<Array<{ name: string; size: number }>>([]);
+  const [resetDone, setResetDone] = useState(false);
+  const [probeEmail, setProbeEmail] = useState('');
+  const [probePassword, setProbePassword] = useState('');
+  const [probeResult, setProbeResult] = useState<string | null>(null);
+  const [probing, setProbing] = useState(false);
+
+  const refreshCookieList = useCallback(() => {
+    setCookieList(
+      document.cookie
+        .split('; ')
+        .filter(Boolean)
+        .map((c) => {
+          const eq = c.indexOf('=');
+          return { name: c.slice(0, eq), size: c.length };
+        })
+        .filter((c) => c.name.startsWith('sb-'))
+    );
+  }, []);
 
   const run = useCallback(async () => {
     setRunning(true);
@@ -79,7 +118,6 @@ export default function DiagnosticsPage() {
       }
     };
 
-    // 1. Static asset from the CDN (the page shell itself)
     await attempt(
       'Static page assets (CDN)',
       'GET /logo.svg via camclinic.vercel.app',
@@ -89,8 +127,6 @@ export default function DiagnosticsPage() {
       (s) => s === 200
     );
 
-    // 2. Edge routing / middleware (unauthenticated /terms redirects to
-    // /login; following it to a 200 proves the app server responded)
     await attempt(
       'App server (Vercel edge)',
       'GET /terms (redirects to /login, then loads)',
@@ -100,7 +136,6 @@ export default function DiagnosticsPage() {
       (s) => s === 200
     );
 
-    // 3. Database proxy — GET (same origin as the page)
     await attempt(
       'Database API via proxy — GET',
       `GET /auth/v1/health via camclinic.vercel.app`,
@@ -110,8 +145,6 @@ export default function DiagnosticsPage() {
       (s) => s === 401
     );
 
-    // 4. Database proxy — POST with dummy credentials (400/401 = reached the
-    // database and got an answer; distinguishes POST filtering by antivirus)
     await attempt(
       'Database API via proxy — POST (login call)',
       'POST /auth/v1/token with dummy credentials',
@@ -125,7 +158,6 @@ export default function DiagnosticsPage() {
       (s) => s === 400 || s === 401
     );
 
-    // 5. Direct database reachability (what ad-blockers/URL filters kill)
     await attempt(
       'Direct database endpoint',
       `GET https://${SUPABASE_HOST}/auth/v1/health`,
@@ -135,7 +167,6 @@ export default function DiagnosticsPage() {
       (s) => s === 401
     );
 
-    // 6. IP / protocol info
     try {
       const res = await fetch('https://ipv4.icanhazip.com', { cache: 'no-store' });
       const v4 = (await res.text()).trim();
@@ -144,13 +175,95 @@ export default function DiagnosticsPage() {
       setIpInfo('IP lookup unreachable');
     }
 
+    refreshCookieList();
     setRunning(false);
-  }, []);
+  }, [refreshCookieList]);
 
   useEffect(() => {
     void run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** Run the real production auth engine: client construction, cookie read,
+   * lock acquisition, and (if a stored token is expired) a real refresh POST. */
+  const runAuthEngineTest = async () => {
+    setAuthTest(null);
+    const t0 = performance.now();
+    try {
+      const client = createClient();
+      const { data } = await raceTimeout(
+        client.auth.getSession(),
+        12000,
+        'Auth engine did not respond in 12s (possible stuck lock or corrupted local session data)'
+      );
+      const ms = Math.round(performance.now() - t0);
+      setAuthTest({
+        outcome: 'pass',
+        ms,
+        detail: data.session
+          ? `Session restored (user: ${data.session.user.email})`
+          : 'No stored session (fresh state — normal after clearing data or sign-out)',
+      });
+    } catch (e) {
+      const ms = Math.round(performance.now() - t0);
+      const msg = e instanceof Error ? e.message : String(e);
+      const hang = ms >= 11900;
+      setAuthTest({
+        outcome: hang ? 'hang' : 'fail',
+        ms,
+        detail: msg,
+      });
+    }
+    refreshCookieList();
+  };
+
+  /** Clear all local app data (session cookies, local/session storage).
+   * Fixes corrupted session state left by earlier bugs. */
+  const resetLocalData = async () => {
+    // Expire every sb-* cookie on this origin
+    document.cookie.split('; ').filter(Boolean).forEach((c) => {
+      const name = c.split('=')[0];
+      if (name.startsWith('sb-')) {
+        document.cookie = `${name}=; path=/; max-age=0`;
+        document.cookie = `${name}=; path=/; max-age=0; domain=${window.location.hostname}`;
+      }
+    });
+    try {
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith('sb-') || k.includes('supabase'))
+        .forEach((k) => localStorage.removeItem(k));
+      sessionStorage.clear();
+    } catch {
+      // storage unavailable — ignore
+    }
+    setResetDone(true);
+    refreshCookieList();
+  };
+
+  /** Real sign-in with the exact production code path (same client the login
+   * page uses). Entered credentials are used only for this request. */
+  const runSignInProbe = async () => {
+    setProbeResult(null);
+    setProbing(true);
+    try {
+      const client = createClient();
+      const { data, error } = await raceTimeout(
+        client.auth.signInWithPassword({ email: probeEmail, password: probePassword }),
+        20000,
+        'Sign-in did not complete in 20s'
+      );
+      if (error) {
+        setProbeResult(`FAILED: ${error.message} (code: ${error.status ?? error.name})`);
+      } else {
+        setProbeResult(`SUCCESS — signed in as ${data.user?.email}. Go to /dashboard.`);
+      }
+    } catch (e) {
+      setProbeResult(`HANG/ERROR: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setProbing(false);
+    }
+    refreshCookieList();
+  };
 
   const summaryText = [
     'CamClinic connection diagnostics',
@@ -161,7 +274,12 @@ export default function DiagnosticsPage() {
       (r) =>
         `${r.outcome.toUpperCase().padEnd(4)} ${r.name}: status=${r.status ?? '-'} ${r.ms ?? '-'}ms${r.note ? ` (${r.note})` : ''}`
     ),
-  ].join('\n');
+    authTest ? `AUTH-ENGINE ${authTest.outcome.toUpperCase()} ${authTest.ms}ms — ${authTest.detail}` : '',
+    `Local sb-* cookies: ${cookieList.map((c) => `${c.name}(${c.size}b)`).join(', ') || 'none'}`,
+    probeResult ? `SIGN-IN PROBE: ${probeResult}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   const copy = async () => {
     try {
@@ -172,21 +290,24 @@ export default function DiagnosticsPage() {
     }
   };
 
-  const color = (o: TestResult['outcome']) =>
+  const color = (o: 'pass' | 'fail' | 'hang' | 'pending') =>
     o === 'pass'
       ? 'bg-green-50 text-green-700 border-green-200'
       : o === 'pending'
         ? 'bg-gray-50 text-gray-500 border-gray-200'
         : 'bg-red-50 text-red-700 border-red-200';
 
+  const bigCookie = cookieList.some((c) => c.size > 4000);
+  const manyCookies = cookieList.length > 6;
+
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-8">
-      <div className="mx-auto max-w-2xl space-y-4">
+      <div className="mx-auto max-w-2xl space-y-5">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-lg font-semibold text-gray-900">Connection Diagnostics</h1>
             <p className="text-sm text-gray-500">
-              Tests how this machine reaches the CamClinic app and database.
+              Tests how this machine reaches the app, database, and the sign-in engine.
             </p>
           </div>
           <button
@@ -202,9 +323,7 @@ export default function DiagnosticsPage() {
           {results.map((r) => (
             <div key={r.name} className={`rounded-xl border p-3 ${color(r.outcome)}`}>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium">
-                  {r.name}
-                </span>
+                <span className="text-sm font-medium">{r.name}</span>
                 <span className="text-xs font-semibold uppercase">
                   {r.outcome === 'pass' ? 'OK' : r.outcome}
                   {r.ms !== undefined ? ` · ${r.ms}ms` : ''}
@@ -224,17 +343,121 @@ export default function DiagnosticsPage() {
           )}
         </div>
 
+        {/* Deep auth engine */}
+        <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">Auth engine test</h2>
+              <p className="text-xs text-gray-500">
+                Runs the exact sign-in engine used by the app (reads the local session,
+                acquires the auth lock, refreshes an expired token).
+              </p>
+            </div>
+            <button
+              onClick={() => void runAuthEngineTest()}
+              className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white"
+            >
+              Test auth engine
+            </button>
+          </div>
+          {authTest && (
+            <div className={`rounded-lg border p-3 text-xs ${color(authTest.outcome)}`}>
+              <span className="font-semibold uppercase">
+                {authTest.outcome} {authTest.ms !== undefined ? `· ${authTest.ms}ms` : ''}
+              </span>
+              <p className="mt-1">{authTest.detail}</p>
+            </div>
+          )}
+
+          <div className="text-xs text-gray-600">
+            <p className="font-medium text-gray-800">
+              Local session cookies ({cookieList.length})
+              {bigCookie && <span className="ml-2 text-red-600">oversized cookie detected</span>}
+              {manyCookies && <span className="ml-2 text-red-600">too many chunks</span>}
+            </p>
+            {cookieList.length === 0 ? (
+              <p className="mt-1 text-gray-400">none (signed out / cleared)</p>
+            ) : (
+              <ul className="mt-1 space-y-0.5">
+                {cookieList.map((c) => (
+                  <li key={c.name} className={c.size > 4000 ? 'text-red-600' : ''}>
+                    {c.name} — {c.size} bytes
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => void resetLocalData()}
+              className="rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700"
+            >
+              Clear local app data (sign out everywhere on this browser)
+            </button>
+            {resetDone && (
+              <span className="text-xs text-green-700">
+                Cleared — now <a className="underline" href="/login">open the login page</a> and sign in again.
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Real sign-in probe */}
+        <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900">Advanced: real sign-in test</h2>
+            <p className="text-xs text-gray-500">
+              Same code path as the login page — used only to compare when /login fails.
+              Credentials are sent only to this site, never stored.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              type="email"
+              placeholder="email"
+              value={probeEmail}
+              onChange={(e) => setProbeEmail(e.target.value)}
+              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+            <input
+              type="password"
+              placeholder="password"
+              value={probePassword}
+              onChange={(e) => setProbePassword(e.target.value)}
+              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+            <button
+              onClick={() => void runSignInProbe()}
+              disabled={probing || !probeEmail || !probePassword}
+              className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {probing ? 'Testing…' : 'Test sign-in'}
+            </button>
+          </div>
+          {probeResult && (
+            <div
+              className={`rounded-lg border p-3 text-xs ${
+                probeResult.startsWith('SUCCESS')
+                  ? 'bg-green-50 text-green-700 border-green-200'
+                  : 'bg-red-50 text-red-700 border-red-200'
+              }`}
+            >
+              {probeResult}
+            </div>
+          )}
+        </div>
+
         {ipInfo && <p className="text-xs text-gray-400">{ipInfo}</p>}
 
         <div className="rounded-xl border border-gray-200 bg-white p-4 text-xs leading-relaxed text-gray-600">
           <p className="font-medium text-gray-800">How to read this</p>
           <p className="mt-1">
-            All rows <strong>OK</strong> → the app should work; sign in again.{' '}
-            <strong>POST row fails/hangs while GET rows are OK</strong> → antivirus or
-            &quot;web protection&quot; software on this system is filtering login requests —
-            disable it for this site or add camclinic.vercel.app to its allow-list.{' '}
-            <strong>Everything hangs</strong> → this machine&apos;s internet (Wi-Fi/router/ISP)
-            is the problem — try a phone hotspot to confirm.
+            All network rows OK but <strong>auth engine HANGs or cookies look oversized/too many</strong>{' '}
+            → corrupted local session data (common after the older redirect-loop bug) → press{' '}
+            <strong>Clear local app data</strong> above, then sign in again. Auth engine OK but sign-in
+            probe fails with a server error → credential/account issue, not this machine.
+            Everything OK → the app should work; sign in again.
           </p>
         </div>
 
