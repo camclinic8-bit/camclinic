@@ -1,22 +1,25 @@
 'use client';
 
 import { ReactNode, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { useAuthStore } from '@/stores/authStore';
 
 function AuthGate({ children }: { children: ReactNode }) {
-  const router = useRouter();
   const isLoading = useAuthStore((s) => s.isLoading);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isSlowConnection = useAuthStore((s) => s.isSlowConnection);
 
   useEffect(() => {
-    // Once the session check completes, redirect if not authenticated
+    // Once the session check completes, redirect if not authenticated.
+    // Full-page navigation (not router.replace): if the server middleware
+    // still has a valid session it bounces back with a fresh document load,
+    // re-running AuthInitializer. A client-side replace would skip that and
+    // ping-pong between /login and /dashboard forever.
     if (!isLoading && !isAuthenticated) {
-      router.replace('/login');
+      window.location.replace('/login');
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated]);
 
   // Brief skeleton while session check runs (usually < 300ms)
   if (isLoading) {
@@ -35,7 +38,15 @@ function AuthGate({ children }: { children: ReactNode }) {
           </div>
         </div>
         {/* Content skeleton */}
-        <div className="flex-1 bg-gray-50" />
+        <div className="flex-1 bg-gray-50 flex items-center justify-center px-4">
+          {isSlowConnection && (
+            <p className="text-sm text-gray-500 text-center max-w-sm">
+              Still connecting — this is taking longer than usual. Check your
+              internet connection or any ad-blocker/proxy that may be blocking
+              the database service, then refresh.
+            </p>
+          )}
+        </div>
       </div>
     );
   }

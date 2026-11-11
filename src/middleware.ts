@@ -13,8 +13,10 @@ export const config = {
     '/customers/:path*',
     '/technicians/:path*',
     '/branches/:path*',
+    '/inventory/:path*',
     '/reports/:path*',
     '/settings/:path*',
+    '/terms',
     '/login',
   ],
 };

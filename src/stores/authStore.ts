@@ -9,9 +9,12 @@ interface AuthState {
   isLoading: boolean;
   /** True once getSession() confirmed a valid session (even before profile loads). */
   isAuthenticated: boolean;
+  /** True when session bootstrap is taking unusually long (slow/blocked network). */
+  isSlowConnection: boolean;
   setUser: (user: Profile | null) => void;
   setLoading: (loading: boolean) => void;
   setAuthenticated: (auth: boolean) => void;
+  setSlowConnection: (slow: boolean) => void;
   logout: () => void;
 }
 
@@ -19,8 +22,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isLoading: true,       // start true: we don't know auth state yet
   isAuthenticated: false,
+  isSlowConnection: false,
   setUser: (user) => set({ user }),
   setLoading: (isLoading) => set({ isLoading }),
   setAuthenticated: (isAuthenticated) => set({ isAuthenticated }),
-  logout: () => set({ user: null, isLoading: false, isAuthenticated: false }),
+  setSlowConnection: (isSlowConnection) => set({ isSlowConnection }),
+  logout: () => set({ user: null, isLoading: false, isAuthenticated: false, isSlowConnection: false }),
 }));
